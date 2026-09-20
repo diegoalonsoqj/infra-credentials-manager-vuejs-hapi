@@ -1,0 +1,29 @@
+/* =============================================================================
+   index.css — Base global para layout de altura completa.
+   Permite que el layout flex ocupe exactamente 100vh sin scroll de página.
+============================================================================= */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Eliminar bullet del nav-item dropdown en el header de CoreUI */
+.header li,
+.header .nav-item {
+  list-style: none !important;
+}
+.header li::marker,
+.header .nav-item::marker {
+  content: '' !important;
+}
+
+/* Cabeceras sticky en tablas con scroll interno */
+.table-sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--cui-body-bg);
+  box-shadow: 0 1px 0 var(--cui-border-color);
+}

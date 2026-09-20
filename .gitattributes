@@ -1,0 +1,4 @@
+# Los archivos .sql se versionan con LF: el checksum de las migraciones
+# depende del contenido, y mezclar finales de linea entre plataformas genera
+# ruido innecesario en el control de integridad.
+database/**/*.sql text eol=lf

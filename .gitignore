@@ -1,0 +1,102 @@
+# =============================================================================
+# infra-credentials-manager — .gitignore
+# Evita versionar secretos, dependencias y artefactos generados.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Variables de entorno y SECRETOS (CRÍTICO)
+# Nunca commitear .env: contiene DB_PASSWORD, JWT_SECRET, MASTER_KEY, etc.
+# Los .env.example SÍ se versionan (son plantillas sin valores reales).
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Otros formatos de secretos / credenciales
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.crt
+*.cert
+secrets.json
+credentials.json
+
+# Marcador de instalación (generado por el wizard, contiene datos del setup)
+.installed
+
+# -----------------------------------------------------------------------------
+# Dependencias
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+
+# -----------------------------------------------------------------------------
+# Artefactos de build
+# -----------------------------------------------------------------------------
+dist/
+dist-ssr/
+build/
+*.local
+
+# -----------------------------------------------------------------------------
+# Logs
+# (pueden contener datos sensibles: IPs, payloads, errores con contexto)
+# -----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------------------------------------------------------------
+# Cachés y temporales
+# -----------------------------------------------------------------------------
+.cache/
+.vite/
+.temp/
+*.tmp
+coverage/
+
+# -----------------------------------------------------------------------------
+# Copias de seguridad de la base (CRÍTICO)
+# Llevan los hashes de contraseña de los usuarios y las credenciales cifradas.
+# No se descifran sin la MASTER_KEY, pero no tienen nada que hacer en el
+# repositorio: van a un almacén cifrado y fuera del servidor de la base.
+# -----------------------------------------------------------------------------
+backups/
+*.sql.gz
+*.dump
+*.sql.gz.meta.json
+
+# -----------------------------------------------------------------------------
+# Documentación de trabajo interna
+# Notas del proceso: auditorías de seguridad, hallazgos, bitácoras de pruebas.
+# Describen con detalle las debilidades del sistema y las decisiones tomadas:
+# se quedan en local. Lo que el repositorio publica es README.md y deploy/.
+# -----------------------------------------------------------------------------
+AUDITORIA_SEGURIDAD.md
+AUDITORIA*.md
+NOTAS*.md
+BITACORA*.md
+*_INTERNO.md
+
+# Pruebas automaticas: utiles para trabajar sobre el codigo, no forman parte
+# de lo que se despliega ni de lo que el repositorio publica.
+backend/tests/
+
+# -----------------------------------------------------------------------------
+# Editor / OS / herramientas locales
+# Configuración propia de cada desarrollador: no debe versionarse.
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
