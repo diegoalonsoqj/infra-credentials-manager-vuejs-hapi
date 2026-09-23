@@ -6,17 +6,18 @@
       :narrow="sidebarNarrow"
     />
 
-    <!-- Botón toggle contraer/expandir sidebar -->
+    <!-- Botón toggle contraer/expandir sidebar: sobre el borde, a la altura de la cabecera -->
     <button
       v-if="sidebarVisible"
       @click="sidebarNarrow = !sidebarNarrow"
       :title="sidebarNarrow ? 'Expandir' : 'Contraer a iconos'"
+      :aria-label="sidebarNarrow ? 'Expandir barra lateral' : 'Contraer barra lateral a iconos'"
       :style="{
         position: 'fixed',
-        bottom: '60px',
-        left: (sidebarWidth - 14) + 'px',
-        width: '28px',
-        height: '28px',
+        top: ((HEADER_HEIGHT - TOGGLE_SIZE) / 2) + 'px',
+        left: (sidebarWidth - TOGGLE_SIZE / 2) + 'px',
+        width: TOGGLE_SIZE + 'px',
+        height: TOGGLE_SIZE + 'px',
         borderRadius: '50%',
         border: '1px solid rgba(255,255,255,0.2)',
         background: '#1a2332',
@@ -63,6 +64,8 @@ import AppHeader from './AppHeader.vue'
 
 const SIDEBAR_FULL   = 256  // 16rem — CoreUI default
 const SIDEBAR_NARROW = 64   // 4rem  — CoreUI sidebar-narrow CSS class
+const HEADER_HEIGHT  = 64   // 4rem  — CoreUI header y sidebar-brand (min-height)
+const TOGGLE_SIZE    = 28
 
 const sidebarVisible = ref(true)
 const sidebarNarrow  = ref(false)
