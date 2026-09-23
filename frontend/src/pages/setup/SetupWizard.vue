@@ -443,9 +443,10 @@ async function handleTestDatabase() {
   error.value = null; success.value = null
   dbTesting.value = true; dbVerified.value = false; dbTestResult.value = null
   try {
+    // Un fallo de conexión llega como 200 con success: false, no como excepción.
     const result = await setupApi.testDatabase(dbConfig)
-    dbTestResult.value = { success: true, message: result.message }
-    dbVerified.value = true
+    dbTestResult.value = { success: result.success === true, message: result.message }
+    dbVerified.value = result.success === true
   } catch (err) {
     dbTestResult.value = { success: false, message: err.message || 'Error al probar la conexión.' }
     dbVerified.value = false

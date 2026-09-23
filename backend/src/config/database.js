@@ -165,8 +165,11 @@ async function testConnection(config) {
     return { success: true };
   } catch (err) {
     // Loguear solo el código de error, nunca el mensaje completo en producción
-    logger.warn('testConnection failed', { code: err.code });
-    return { success: false, code: err.code, originalCode: err.code };
+    // El timeout de connectionTimeoutMillis de pg no trae código: se detecta por
+    // el mensaje para no mostrarlo como un error genérico.
+    const timedOut = !err.code && /timeout/i.test(err.message || '');
+    logger.warn('testConnection failed', { code: err.code, timedOut });
+    return { success: false, code: err.code, originalCode: err.code, timedOut };
   } finally {
     if (client) client.release();
     // Cerrar el pool temporal siempre, incluso si hubo error

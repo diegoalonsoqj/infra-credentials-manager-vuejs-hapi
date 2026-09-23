@@ -39,9 +39,13 @@ const PG_ERROR_MESSAGES = {
   '08001':        'No se pudo conectar al servidor de base de datos.',
   '08006':        'Conexión perdida con el servidor de base de datos.',
   '42501':        'El usuario no tiene permisos suficientes en la base de datos.',
+  '53300':        'Límite de conexiones alcanzado (del usuario, de la base o del servidor). Revisa rolconnlimit, datconnlimit y max_connections.',
+  '57P03':        'El servidor de base de datos aún no acepta conexiones (arrancando o en recuperación).',
   'ECONNREFUSED': null, // se construye con host:port abajo
   'ETIMEDOUT':    'Tiempo de espera agotado al conectar.',
   'ENOTFOUND':    'No se pudo resolver el nombre del host.',
+  'EHOSTUNREACH': 'Host inalcanzable. Verifica la red y las rutas hacia el servidor.',
+  'ECONNRESET':   'El servidor cerró la conexión. Revisa la opción SSL y pg_hba.conf.',
 };
 
 /**
@@ -69,6 +73,11 @@ async function stepTestDatabase(config) {
     message = 'Tiempo de espera agotado. Verifica el host, puerto y firewall.';
   } else if (result.originalCode === 'ENOTFOUND') {
     message = `No se pudo resolver el host '${config.host}'. Verifica el nombre del servidor.`;
+  } else if (result.originalCode) {
+    // Código SQLSTATE o de red sin mensaje propio: se muestra para poder buscarlo.
+    message = `Error al conectar con la base de datos (código ${result.originalCode}).`;
+  } else if (result.timedOut) {
+    message = 'Tiempo de espera agotado. Verifica el host, puerto y firewall.';
   }
 
   return { success: false, message };
