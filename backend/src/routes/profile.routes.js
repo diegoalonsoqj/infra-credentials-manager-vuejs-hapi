@@ -108,6 +108,9 @@ async function runMfa(h, fn) {
     if (err.isValidation) return h.response({ success: false, code: 'VALIDATION_ERROR', message: err.message }).code(400);
     if (err.isForbidden)  return h.response({ success: false, code: 'FORBIDDEN', message: err.message }).code(403);
     if (err.isKeyUnavailable) return h.response({ success: false, code: 'MASTER_KEY_ROTATING', message: err.message }).code(503);
+    if (err.isDirectoryUnavailable) {
+      return h.response({ success: false, code: 'DIRECTORY_UNAVAILABLE', message: 'No se pudo verificar la contraseña con el directorio. Inténtalo más tarde.' }).code(503);
+    }
     throw err;
   }
 }
@@ -128,7 +131,7 @@ module.exports = {
         handler: async (request, h) => {
           const { rows } = await query(
             `SELECT u.id, u.username, u.email, u.full_name, u.first_name, u.last_name,
-                    u.force_pwd_change, u.last_login_at, u.created_at,
+                    u.force_pwd_change, u.last_login_at, u.created_at, u.auth_source,
                     r.code AS role, r.name AS role_name,
                     t.code AS team, t.name AS team_name
              FROM sch_system.tbl_users u
@@ -195,6 +198,15 @@ module.exports = {
         handler: async (request, h) => {
           const user = request.auth.credentials;
           const { currentPassword, newPassword } = request.payload;
+
+          // La contraseña de un usuario LDAP es la del dominio: se cambia en AD.
+          if (user.authSource === 'LDAP') {
+            return h.response({
+              success: false,
+              code: 'LDAP_USER',
+              message: 'Tu contraseña es la del dominio: cámbiala en el directorio (Active Directory), no aquí.',
+            }).code(400);
+          }
 
           // Obtener hash actual
           const { rows } = await query(

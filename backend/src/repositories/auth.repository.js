@@ -18,6 +18,7 @@ function loginUserSql(campo) {
        u.first_name,
        u.last_name,
        u.password_hash,
+       u.auth_source,
        u.force_pwd_change,
        u.failed_attempts,
        u.locked_until,

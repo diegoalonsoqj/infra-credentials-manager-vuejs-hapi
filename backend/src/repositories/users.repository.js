@@ -29,6 +29,7 @@ async function findAll({ page = 1, limit = 20, search = '', roleCode = null, tea
        u.failed_attempts,
        u.locked_until,
        u.mfa_enabled,
+       u.auth_source,
        u.estado,
        u.estado_registro,
        u.created_at,
@@ -87,7 +88,7 @@ async function findById(id) {
     `SELECT
        u.id, u.username, u.email, u.first_name, u.last_name, u.full_name,
        u.force_pwd_change, u.last_login_at,
-       u.failed_attempts, u.locked_until, u.mfa_enabled,
+       u.failed_attempts, u.locked_until, u.mfa_enabled, u.auth_source,
        u.estado, u.estado_registro, u.created_at, u.updated_at,
        r.id    AS role_id,
        r.code  AS role,
@@ -154,23 +155,31 @@ async function findAllTeams() {
 
 /**
  * Crea un nuevo usuario.
+ *
+ * Un usuario LDAP se crea sin hash y sin force_pwd_change: su contraseña es la
+ * del dominio y ICM no la gestiona.
  */
-async function create({ username, email, firstName, lastName, fullName, passwordHash, roleId, teamId, createdBy }) {
+async function create({ username, email, firstName, lastName, fullName, passwordHash, roleId, teamId, createdBy, authSource = 'LOCAL' }) {
   const { rows } = await query(
     `INSERT INTO sch_system.tbl_users
        (username, email, first_name, last_name, full_name, password_hash, role_id, team_id,
-        force_pwd_change, estado_registro, estado, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, 'O', 'AI', $9)
-     RETURNING id, username, email, first_name, last_name, full_name`,
-    [username, email, firstName, lastName, fullName, passwordHash, roleId, teamId || null, createdBy]
+        force_pwd_change, estado_registro, estado, created_by, auth_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10 = 'LOCAL', 'O', 'AI', $9, $10)
+     RETURNING id, username, email, first_name, last_name, full_name, auth_source`,
+    [username, email, firstName, lastName, fullName, passwordHash || null, roleId, teamId || null, createdBy, authSource]
   );
   return rows[0];
 }
 
 /**
  * Actualiza los datos de un usuario.
+ *
+ * authSource cambia el origen de la contraseña en la misma sentencia:
+ *   - a LDAP: se borra el hash y la marca de cambio obligatorio.
+ *   - a LOCAL: exige passwordHash (temporal) y obliga a cambiarla al entrar,
+ *     igual que un reseteo desde el panel.
  */
-async function update(id, { email, firstName, lastName, fullName, roleId, teamId }) {
+async function update(id, { email, firstName, lastName, fullName, roleId, teamId, authSource, passwordHash }) {
   const { rows } = await query(
     `UPDATE sch_system.tbl_users
      SET
@@ -180,12 +189,38 @@ async function update(id, { email, firstName, lastName, fullName, roleId, teamId
        full_name  = $5,
        role_id    = $6,
        team_id    = $7,
+       auth_source      = COALESCE($8, auth_source),
+       password_hash    = CASE WHEN $8 = 'LDAP' THEN NULL
+                               WHEN $9::text IS NOT NULL THEN $9
+                               ELSE password_hash END,
+       force_pwd_change = CASE WHEN $8 = 'LDAP' THEN FALSE
+                               WHEN $9::text IS NOT NULL THEN TRUE
+                               ELSE force_pwd_change END,
        updated_at = NOW()
      WHERE id = $1 AND estado_registro = 'O'
-     RETURNING id, username, email, first_name, last_name, full_name`,
-    [id, email, firstName, lastName, fullName, roleId, teamId || null]
+     RETURNING id, username, email, first_name, last_name, full_name, auth_source`,
+    [id, email, firstName, lastName, fullName, roleId, teamId || null, authSource || null, passwordHash || null]
   );
   return rows[0] || null;
+}
+
+/**
+ * Administradores activos con contraseña LOCAL, sin contar a excludeId.
+ * Debe quedar siempre al menos uno: es la forma de entrar si el directorio no
+ * responde o se desactiva LDAP.
+ */
+async function countActiveLocalAdmins(adminLevel, excludeId = null) {
+  const { rows } = await query(
+    `SELECT COUNT(*) AS total
+     FROM sch_system.tbl_users u
+     JOIN sch_system.tbl_roles r ON r.id = u.role_id
+     WHERE r.level >= $1
+       AND u.estado = 'AI' AND u.estado_registro = 'O'
+       AND u.auth_source = 'LOCAL'
+       AND ($2::uuid IS NULL OR u.id <> $2)`,
+    [adminLevel, excludeId]
+  );
+  return parseInt(rows[0].total, 10);
 }
 
 /**
@@ -283,6 +318,7 @@ module.exports = {
   findAllTeams,
   create,
   update,
+  countActiveLocalAdmins,
   setEstado,
   softDelete,
   updatePasswordHash,

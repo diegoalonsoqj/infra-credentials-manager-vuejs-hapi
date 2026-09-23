@@ -8,6 +8,7 @@ const { AUDIT_ACTIONS, RESULT, ROLE_LEVELS } = require('../config/constants');
 const settings = require('../config/settings');
 const logger = require('../utils/logger');
 const custody = require('./custody');
+const directory = require('./directory.service');
 
 // =============================================================================
 // users.service.js — Lógica de negocio para administración de usuarios.
@@ -62,11 +63,39 @@ async function getUser(id) {
  * Retorna todos los roles y equipos (para poblar los selects del form).
  */
 async function getCatalogs() {
-  const [roles, teams] = await Promise.all([
+  const [roles, teams, ldapConfig, ldapEnabled] = await Promise.all([
     repo.findAllRoles(),
     repo.findAllTeams(),
+    directory.getConfig(),
+    directory.isEnabled(),
   ]);
-  return { roles, teams };
+  // Para el formulario: la opción "LDAP" solo se ofrece con el directorio configurado.
+  return { roles, teams, ldap: { configured: ldapConfig.ok, enabled: ldapEnabled } };
+}
+
+/** El alta o el paso a LDAP exigen el directorio configurado en Configuración. */
+async function assertLdapConfigured() {
+  const config = await directory.getConfig();
+  if (!config.ok) {
+    throw new ValidationError(`No se pueden crear usuarios LDAP: ${config.error}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Siempre debe quedar al menos un ADMIN activo con contraseña LOCAL. Si el
+// directorio cae o se desactiva LDAP, es la única forma de entrar a arreglarlo.
+// Se comprueba al desactivar, eliminar, degradar o pasar a LDAP a un ADMIN local.
+// ---------------------------------------------------------------------------
+async function assertQuedaAdminLocal(user, accion) {
+  const esAdminLocalActivo = user.level >= ROLE_LEVELS.ADMIN && user.estado === 'AI' &&
+    (user.auth_source || 'LOCAL') === 'LOCAL';
+  if (!esAdminLocalActivo) return;
+  if (await repo.countActiveLocalAdmins(ROLE_LEVELS.ADMIN, user.id) === 0) {
+    throw new ValidationError(
+      `No puedes ${accion} a ${user.username}: es el último administrador con contraseña local. ` +
+      'Debe quedar al menos uno para poder entrar si el directorio no responde.'
+    );
+  }
 }
 
 /**
@@ -88,10 +117,15 @@ async function configuredPasswordMinLength() {
  */
 async function createUser(data, actor) {
   const { username, email, firstName, lastName, password, roleCode, teamCode } = data;
+  const authSource = data.authSource === 'LDAP' ? 'LDAP' : 'LOCAL';
 
-  // Validar contraseña
-  const pwdValidation = validatePasswordStrength(password, await configuredPasswordMinLength());
-  if (!pwdValidation.valid) throw new ValidationError(pwdValidation.message);
+  // Un usuario LDAP no tiene contraseña en ICM: la comprueba el directorio.
+  if (authSource === 'LDAP') {
+    await assertLdapConfigured();
+  } else {
+    const pwdValidation = validatePasswordStrength(password, await configuredPasswordMinLength());
+    if (!pwdValidation.valid) throw new ValidationError(pwdValidation.message);
+  }
 
   // Obtener IDs de rol y equipo
   const { roles, teams } = await getCatalogs();
@@ -120,7 +154,7 @@ async function createUser(data, actor) {
     throw new ValidationError(`${field} ya está en uso.`);
   }
 
-  const passwordHash = await bcrypt.hash(password, 14);
+  const passwordHash = authSource === 'LOCAL' ? await bcrypt.hash(password, 14) : null;
   const newUser = await repo.create({
     username:  username.trim(),
     email:     email.trim().toLowerCase(),
@@ -131,6 +165,7 @@ async function createUser(data, actor) {
     roleId:    role.id,
     teamId,
     createdBy: actor.id,
+    authSource,
   });
 
   await auditAction({
@@ -140,7 +175,7 @@ async function createUser(data, actor) {
     targetId:      newUser.id,
     targetUsername: newUser.username,
     result:        RESULT.SUCCESS,
-    extra:         { role: roleCode, team: teamCode || null },
+    extra:         { role: roleCode, team: teamCode || null, authSource },
     ipAddress:     actor.ip,
   });
 
@@ -160,6 +195,23 @@ async function updateUser(id, data, actor) {
 
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Usuario no encontrado.');
+
+  // Cambio de origen de la contraseña (LOCAL ↔ LDAP).
+  const currentSource = existing.auth_source || 'LOCAL';
+  const newSource = data.authSource && data.authSource !== currentSource ? data.authSource : null;
+  let newPasswordHash = null;
+  if (newSource === 'LDAP') {
+    await assertLdapConfigured();
+    await assertQuedaAdminLocal(existing, 'pasar a LDAP');
+  } else if (newSource === 'LOCAL') {
+    // Pasa a tener contraseña propia: la fija el ADMIN y el usuario la cambia al entrar.
+    if (!data.newPassword) {
+      throw new ValidationError('Para pasar el usuario a contraseña local, indica una contraseña temporal.');
+    }
+    const pwdValidation = validatePasswordStrength(data.newPassword, await configuredPasswordMinLength());
+    if (!pwdValidation.valid) throw new ValidationError(pwdValidation.message);
+    newPasswordHash = await bcrypt.hash(data.newPassword, 14);
+  }
 
   const newRoleCode = roleCode || existing.role;
   const { roles, teams } = await getCatalogs();
@@ -210,6 +262,9 @@ async function updateUser(id, data, actor) {
       throw new ValidationError('No puedes quitar el rol de administrador al último administrador activo del sistema.');
     }
   }
+  if (role.level < ROLE_LEVELS.ADMIN && newSource !== 'LDAP') {
+    await assertQuedaAdminLocal(existing, 'quitar el rol de administrador');
+  }
 
   // Verificar email único (excluyendo el propio usuario)
   if (email && email.toLowerCase() !== existing.email) {
@@ -228,6 +283,8 @@ async function updateUser(id, data, actor) {
     fullName:  resolvedFullName,
     roleId:    role.id,
     teamId,
+    authSource:   newSource,
+    passwordHash: newPasswordHash,
   });
 
   await auditAction({
@@ -237,7 +294,10 @@ async function updateUser(id, data, actor) {
     targetId:      id,
     targetUsername: existing.username,
     result:        RESULT.SUCCESS,
-    extra:         { role: newRoleCode, team: teamCode || null },
+    extra:         {
+      role: newRoleCode, team: teamCode || null,
+      ...(newSource ? { authSource: { from: currentSource, to: newSource } } : {}),
+    },
     ipAddress:     actor.ip,
   });
 
@@ -279,6 +339,7 @@ async function toggleEstado(id, actor) {
   // custodia quedarían sin nadie capaz de descifrarlas. Solo al
   // desactivar; reactivar debe seguir siendo posible siempre.
   if (user.estado === 'AI') {
+    await assertQuedaAdminLocal(user, 'desactivar');
     await assertSinCustodias(id, user.username, 'desactivar');
   }
 
@@ -323,6 +384,7 @@ async function deleteUser(id, actor) {
   }
 
   // Mismo motivo que al desactivar.
+  await assertQuedaAdminLocal(user, 'eliminar');
   await assertSinCustodias(id, user.username, 'eliminar');
 
   await repo.softDelete(id);
@@ -348,6 +410,13 @@ async function deleteUser(id, actor) {
 async function resetPassword(id, newPassword, actor) {
   const user = await repo.findById(id);
   if (!user) throw new NotFoundError('Usuario no encontrado.');
+
+  if (user.auth_source === 'LDAP') {
+    throw new ValidationError(
+      `${user.username} usa la contraseña del dominio: se resetea en Active Directory. ` +
+      'Para darle una contraseña de ICM, edítalo y cambia su origen a local.'
+    );
+  }
 
   const pwdValidation = validatePasswordStrength(newPassword, await configuredPasswordMinLength());
   if (!pwdValidation.valid) throw new ValidationError(pwdValidation.message);

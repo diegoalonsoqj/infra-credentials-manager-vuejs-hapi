@@ -1,8 +1,8 @@
 'use strict';
 
 const crypto  = require('crypto');
-const bcrypt  = require('bcryptjs');
 const repo    = require('../repositories/mfa.repository');
+const { verifyPassword } = require('./passwordVerifier');
 const totp    = require('../utils/totp');
 const settings = require('../config/settings');
 const { query } = require('../config/database');
@@ -124,7 +124,8 @@ async function verifyCode(userId, code) {
 async function reauth(user, { password, code }) {
   const state = await repo.getState(user.id);
   if (!state || !state.mfa_enabled) throw new ValidationError('El segundo factor no está activado.');
-  const passOk = await bcrypt.compare(String(password || ''), state.password_hash);
+  // Contraseña local o de dominio, según el origen del usuario.
+  const passOk = (await verifyPassword(state, password)).ok;
   const codeOk = passOk ? (await verifyCode(user.id, code)).ok : false;
   if (!passOk || !codeOk) throw new ValidationError('Contraseña o código incorrectos.');
 }
@@ -164,6 +165,6 @@ async function adminReset(target, actor) {
 
 module.exports = {
   POLICIES, DEFAULT_POLICY, isRequired, status, beginSetup, confirmSetup, verifyCode,
-  disable, regenerateRecoveryCodes, adminReset, hashRecovery, normalizeRecovery,
+  disable, regenerateRecoveryCodes, adminReset, hashRecovery, normalizeRecovery, reauth,
   ValidationError, ForbiddenError,
 };

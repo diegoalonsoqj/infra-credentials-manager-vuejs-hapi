@@ -15,6 +15,7 @@ const { withActiveMasterKey, MasterKeyUnavailableError } = require('./credential
 async function getState(userId) {
   const { rows } = await query(
     `SELECT mfa_enabled, mfa_secret_encrypted IS NOT NULL AS has_secret, mfa_last_step, password_hash,
+            username, auth_source,
             (SELECT COUNT(*)::int FROM sch_system.tbl_mfa_recovery_codes c
               WHERE c.user_id = u.id AND c.used_at IS NULL) AS recovery_left
      FROM sch_system.tbl_users u

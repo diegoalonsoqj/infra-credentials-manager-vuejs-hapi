@@ -159,6 +159,19 @@ const MFA_MANAGE = {
   },
 };
 
+// Prueba de conexión LDAP desde Configuración (ADMIN). Cada prueba es un bind
+// real contra el directorio: acotarla evita que se use para probar contraseñas
+// de dominio o para bloquear cuentas en AD.
+const LDAP_TEST = {
+  windowMs: 15 * 60 * 1000,
+  max:      10,
+  message: {
+    success: false,
+    code:    'LDAP_TEST_RATE_LIMIT',
+    message: 'Demasiadas pruebas de conexión LDAP. Intenta nuevamente más tarde.',
+  },
+};
+
 // Descifrado: operación CPU-intensiva con pgcrypto.
 const DECRYPT = {
   windowMs: 60 * 1000, // 1 minuto
@@ -197,6 +210,7 @@ const DESCRIPTIONS = [
   { limit: PASSWORD_CHANGE, label: 'Cambios de la propia contraseña',    scope: 'usuario',      source: null },
   { limit: MFA_MANAGE,      label: 'Gestión del segundo factor',        scope: 'usuario',      source: 'RATE_LIMIT_MFA_MAX' },
   { limit: PASSWORD_ADMIN,  label: 'Altas y reseteos de contraseña de usuarios', scope: 'administrador', source: null },
+  { limit: LDAP_TEST,       label: 'Pruebas de conexión LDAP',           scope: 'administrador', source: null },
   { limit: SETUP_TEST_DB,   label: 'Pruebas de conexión del asistente de instalación', scope: 'IP', source: null },
   { limit: SETUP_FINALIZE,  label: 'Intentos de finalizar la instalación', scope: 'IP',         source: null },
 ];
@@ -214,6 +228,6 @@ function describeLimits() {
 module.exports = {
   describeLimits,
   GLOBAL_IP, GLOBAL_USER, BY_USER, AUTH_IP, AUTH_MFA_IP, AUTH, SETUP_TEST_DB, SETUP_FINALIZE, DECRYPT,
-  PASSWORD_CHANGE, PASSWORD_ADMIN, MFA_MANAGE,
+  PASSWORD_CHANGE, PASSWORD_ADMIN, MFA_MANAGE, LDAP_TEST,
   BY_PATH_PREFIX,
 };

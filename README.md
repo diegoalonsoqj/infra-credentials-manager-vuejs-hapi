@@ -24,11 +24,12 @@ descifran bajo control de acceso por roles y equipos.
 6. [Primera instalación (wizard)](#primera-instalación-wizard)
 7. [Resetear la contraseña de admin](#resetear-la-contraseña-de-admin)
 8. [Segundo factor (MFA)](#segundo-factor-mfa)
-9. [Ajustes desde el panel](#ajustes-desde-el-panel)
-10. [Tareas de mantenimiento](#tareas-de-mantenimiento)
-11. [Roles y permisos](#roles-y-permisos)
-12. [Endpoints de la API](#endpoints-de-la-api)
-13. [Seguridad y mantenimiento](#seguridad-y-mantenimiento)
+9. [Active Directory / LDAP](#active-directory--ldap)
+10. [Ajustes desde el panel](#ajustes-desde-el-panel)
+11. [Tareas de mantenimiento](#tareas-de-mantenimiento)
+12. [Roles y permisos](#roles-y-permisos)
+13. [Endpoints de la API](#endpoints-de-la-api)
+14. [Seguridad y mantenimiento](#seguridad-y-mantenimiento)
 
 ---
 
@@ -347,6 +348,51 @@ usuario, que volverá a activarlo en su siguiente acceso.
 
 ---
 
+## Active Directory / LDAP
+
+Los usuarios pueden entrar con su **contraseña de dominio**. El directorio solo
+comprueba la contraseña: **nadie se da de alta solo al iniciar sesión**. Un
+ADMIN crea al usuario en *Usuarios* con origen **LDAP**, su username de dominio,
+su rol y su equipo.
+
+**1. Configurar la conexión** en *Configuración → Directorio*:
+
+| Campo | Ejemplo |
+|---|---|
+| Servidor | `ldaps://ad.empresa.local:636` o `ldap://ad.empresa.local` |
+| Formato del usuario | `EMPRESA\{username}` o `{username}@empresa.local` |
+| StartTLS, validar certificado, CA (PEM) | Cifrado, si el servidor lo admite |
+
+El cifrado es opcional, pero recomendable: sin `ldaps://` ni StartTLS, el bind
+envía la contraseña de dominio en claro por la red, y el panel lo avisa.
+
+Guardar la conexión **pide tu contraseña y el código del segundo factor**, y cada
+intento, correcto o no, queda en la auditoría (`LDAP_CONFIG_UPDATE`) con el valor
+anterior y el nuevo. Es a propósito: quien controla la URL del directorio recibe
+las contraseñas de dominio de quien inicia sesión, y una sesión de administrador
+robada no debe bastar para cambiarla. Hace falta tener el segundo factor activado.
+
+**2. Probar y activar**: la misma tarjeta hace un bind de prueba con un usuario
+del dominio y los valores del formulario, sin guardarlos. Después se activa el
+ajuste `ldap_enabled` de *Seguridad*.
+
+**Qué cambia para un usuario LDAP:**
+
+- No tiene contraseña en ICM: no puede cambiarla desde su perfil ni un ADMIN
+  puede resetearla. Se gestiona en el directorio.
+- El segundo factor, el bloqueo de cuenta, los límites de peticiones y la
+  auditoría se aplican igual. Con la cuenta bloqueada en ICM no se consulta al
+  directorio, para no bloquear también su cuenta de dominio.
+- Si el directorio no responde, el login devuelve 503 y no cuenta como intento
+  fallido.
+
+**Siempre queda al menos un ADMIN con contraseña local**: la aplicación impide
+desactivar, eliminar, degradar o pasar a LDAP al último. Es la forma de entrar si
+el directorio cae. Si aun así hiciera falta, `node scripts/reset-admin-password.js
+<usuario>` le pone una contraseña local, aunque fuera LDAP.
+
+---
+
 ## Ajustes desde el panel
 
 *Configuración* (solo ADMIN) guarda estos valores en la base, no en el `.env`, y
@@ -364,6 +410,7 @@ se aplican sin reiniciar. Fuera de rango, el backend cae a su valor por defecto:
 | `decrypt_timeout_secs` | 30 | 5 – 300 | Cuánto se muestra en pantalla una contraseña descifrada. |
 | `audit_retention_days` | 365 | 1 – 3650 | Días que la auditoría permanece en la tabla activa (ver `archive-audit`). |
 | `allow_visitor_access` | `true` | sí/no | Permite entrar a los usuarios VISITOR. |
+| `ldap_enabled` | `false` | sí/no | Deja entrar a los usuarios LDAP con su contraseña de dominio (ver [Active Directory / LDAP](#active-directory--ldap)). |
 | `cors_origin` | — | texto | Orígenes permitidos; se escribe también en el `.env`. |
 | `app_name`, `locale`, `timezone` | — | texto | Nombre visible, idioma y zona horaria. |
 

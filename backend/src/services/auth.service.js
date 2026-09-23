@@ -9,6 +9,7 @@ const { AUDIT_ACTIONS, RESULT, ROLE_LEVELS } = require('../config/constants');
 const settings  = require('../config/settings');
 const logger    = require('../utils/logger');
 const mfaService = require('./mfa.service');
+const { verifyPassword, DUMMY_BCRYPT_HASH } = require('./passwordVerifier');
 
 // =============================================================================
 // auth.service.js — Lógica de negocio de autenticación.
@@ -73,13 +74,6 @@ function consumirMfaToken(jti, exp) {
 // ignora el ajuste y manda JWT_EXPIRES_IN — un 0 mal tecleado en el panel no
 // debe traducirse en sesiones que caducan al instante.
 const SESSION_TTL_RANGE = { min: 1, max: 43200 };
-
-// Hash bcrypt "señuelo" de factor 14, generado una sola vez al cargar el módulo.
-// Se compara contra él cuando el usuario NO existe o está inactivo, para que la
-// respuesta tarde lo mismo que un login con usuario válido. Sin esto, el login
-// de un usuario inexistente respondería más rápido (no ejecuta bcrypt) y permitiría
-// enumerar usuarios válidos por diferencia de tiempo.
-const DUMMY_BCRYPT_HASH = bcrypt.hashSync('icm_timing_safe_dummy_password', 14);
 
 /**
  * Registra una acción en el log de auditoría.
@@ -206,17 +200,38 @@ async function login({ username, password, ipAddress, userAgent }) {
     throw new AuthError(GENERIC_AUTH_ERROR);
   }
 
-  // 3. Verificar contraseña con bcrypt. Se ejecuta siempre, también con la
-  //    cuenta bloqueada, para que el bloqueo no se pueda deducir por tiempo.
+  // 3. Verificar contraseña (bcrypt o directorio, según auth_source). bcrypt se
+  //    ejecuta siempre, también con la cuenta bloqueada, para que el bloqueo no
+  //    se pueda deducir por tiempo.
+  //
+  //    Con la cuenta bloqueada NO se consulta el directorio: cada intento sería
+  //    también un fallo en AD, y un atacante podría usar ICM para bloquear la
+  //    cuenta de dominio del usuario. El coste es que un usuario LDAP bloqueado
+  //    recibe el mensaje genérico aunque acierte, hasta que venza el bloqueo.
   const isLocked = Boolean(user.locked_until) && new Date(user.locked_until) > new Date();
-  const passwordValid = await bcrypt.compare(password, user.password_hash);
-
-  if (!passwordValid) {
-    await registrarFallo(user, isLocked, {
-      ipAddress, userAgent,
-      action: AUDIT_ACTIONS.LOGIN_FAIL,
-      reason: isLocked ? 'Contraseña incorrecta (cuenta bloqueada).' : 'Contraseña incorrecta.',
+  let check;
+  try {
+    check = await verifyPassword(user, password, { skipDirectory: isLocked });
+  } catch (err) {
+    if (!err.isDirectoryUnavailable) throw err;
+    // No es culpa de quien teclea: no suma al bloqueo de cuenta.
+    await audit({
+      userId: user.id, username: user.username, action: AUDIT_ACTIONS.LOGIN_FAIL,
+      result: RESULT.FAIL, failReason: 'Directorio LDAP no disponible.', ipAddress, userAgent,
     });
+    throw new ServiceUnavailableError('No se pudo verificar la contraseña con el directorio. Inténtalo más tarde.');
+  }
+
+  if (!check.ok) {
+    const reason = isLocked ? `${check.reason} (cuenta bloqueada)` : check.reason;
+    if (check.countable) {
+      await registrarFallo(user, isLocked, { ipAddress, userAgent, action: AUDIT_ACTIONS.LOGIN_FAIL, reason });
+    } else {
+      await audit({
+        userId: user.id, username: user.username, action: AUDIT_ACTIONS.LOGIN_FAIL,
+        result: RESULT.FAIL, failReason: reason, ipAddress, userAgent,
+      });
+    }
 
     // Mensaje genérico SIEMPRE, incluso en el intento que dispara el bloqueo:
     // decir "cuenta bloqueada" aquí confirmaría que el usuario existe. El
@@ -420,6 +435,7 @@ async function completarLogin(user, { ipAddress, userAgent, extra }) {
       teamResourceTypes: user.team_resource_types || [],
       forcePwdChange:    user.force_pwd_change,
       mfaEnabled:        user.mfa_enabled === true,
+      authSource:        user.auth_source || 'LOCAL',
       permissions,
     },
   };
@@ -458,6 +474,15 @@ class AuthError extends Error {
     super(message);
     this.name = 'AuthError';
     this.isAuthError = true;
+  }
+}
+
+/** El directorio LDAP no respondió: 503, no cuenta como intento fallido. */
+class ServiceUnavailableError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+    this.isServiceUnavailable = true;
   }
 }
 
@@ -510,4 +535,4 @@ async function crearSesionAcotada(client, { userId, tokenHash, ipAddress, userAg
   return sobrantes.length;
 }
 
-module.exports = { login, loginMfa, logout, AuthError, crearSesionAcotada };
+module.exports = { login, loginMfa, logout, AuthError, ServiceUnavailableError, crearSesionAcotada };

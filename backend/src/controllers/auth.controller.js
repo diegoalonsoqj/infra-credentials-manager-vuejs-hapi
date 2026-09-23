@@ -89,6 +89,9 @@ async function handleLogin(request, h) {
         message: err.message,
       }).code(401);
     }
+    if (err.isServiceUnavailable) {
+      return h.response({ success: false, code: 'DIRECTORY_UNAVAILABLE', message: err.message }).code(503);
+    }
     throw err;
   }
 }

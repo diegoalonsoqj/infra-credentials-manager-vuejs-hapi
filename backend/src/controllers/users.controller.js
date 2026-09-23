@@ -86,15 +86,29 @@ async function getUser(request, h) {
 // ---------------------------------------------------------------------------
 // POST /api/admin/users
 // ---------------------------------------------------------------------------
+// Origen de la contraseña: LOCAL (bcrypt en ICM) o LDAP (dominio).
+const authSourceField = Joi.string().valid('LOCAL', 'LDAP')
+  .messages(M('El origen de autenticación debe ser LOCAL o LDAP.'));
+
 const createSchema = Joi.object({
+  // En un usuario LDAP es su nombre en el dominio (sAMAccountName).
   username: Joi.string().trim().min(3).max(50).pattern(/^[a-zA-Z0-9._-]+$/).required()
     .messages(M('Username: 3-50 chars, letras, números, punto, guion o guion bajo.')),
   email: normalizedEmail.required().messages(M('Email inválido.')),
   firstName: Joi.string().trim().min(1).required().messages(M('El nombre es obligatorio.')),
   lastName:  Joi.string().trim().min(1).required().messages(M('El apellido es obligatorio.')),
-  password:  Joi.string().min(12).required().messages(M('Contraseña: mínimo 12 caracteres.')),
+  authSource: authSourceField.default('LOCAL'),
+  // Un usuario LDAP no tiene contraseña en ICM: si llega, se descarta.
+  password:  Joi.when('authSource', {
+    is: 'LDAP',
+    then: Joi.any().strip(),
+    otherwise: Joi.string().min(12).required().messages(M('Contraseña: mínimo 12 caracteres.')),
+  }),
   roleCode:  Joi.string().min(1).required().messages(M('El rol es requerido.')),
   teamCode:  teamCodeField,
+  // UserForm.vue envía el mismo formulario al crear y al editar; esta solo se
+  // usa al editar (paso de LDAP a local).
+  newPassword: Joi.any().strip(),
 });
 
 async function createUser(request, h) {
@@ -113,6 +127,9 @@ const updateSchema = Joi.object({
   lastName:  Joi.string().trim().min(1).optional().messages(M('El apellido es obligatorio.')),
   roleCode:  Joi.string().min(1).optional().messages(M('El rol es requerido.')),
   teamCode:  teamCodeField,
+  authSource: authSourceField.optional(),
+  // Contraseña temporal, solo al pasar un usuario de LDAP a LOCAL.
+  newPassword: Joi.string().min(12).allow('').optional().messages(M('Contraseña: mínimo 12 caracteres.')),
   // UserForm.vue reenvía el formulario completo al editar. El username no se
   // puede cambiar y la contraseña va por /reset-password: se aceptan y se
   // descartan, igual que hacía el servicio al no leerlos.

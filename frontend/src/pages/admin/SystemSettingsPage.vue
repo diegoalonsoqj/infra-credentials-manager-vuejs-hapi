@@ -102,6 +102,117 @@
           </CCard>
         </template>
 
+        <!-- Directorio LDAP. Guardar la conexión pide contraseña y segundo factor:
+             quien controla la URL recibe las contraseñas de dominio. Se activa con
+             el ajuste ldap_enabled de Seguridad. -->
+        <CCard v-if="ldap" class="shadow-sm mb-4">
+          <CCardHeader class="py-2 d-flex align-items-center gap-2">
+            <span class="fw-semibold small">Directorio (Active Directory / LDAP)</span>
+            <CBadge :color="ldap.enabled ? 'success' : 'secondary'" style="font-size: 10px">
+              {{ ldap.enabled ? 'activo' : 'inactivo' }}
+            </CBadge>
+          </CCardHeader>
+          <CCardBody class="px-3 py-3">
+            <p class="text-medium-emphasis mb-3" style="font-size: 12px">
+              Conexión con el directorio. Se activa con el ajuste «Autenticación con Active Directory / LDAP»
+              de Seguridad, y solo entran por LDAP los usuarios dados de alta con ese origen en Usuarios.
+            </p>
+            <CAlert v-if="ldap.error" color="warning" class="py-2 small mb-3">{{ ldap.error }}</CAlert>
+
+            <CRow class="g-3">
+              <CCol :md="7">
+                <CFormLabel class="small fw-semibold mb-1">Servidor</CFormLabel>
+                <CFormInput size="sm" v-model.trim="ldapForm.url" placeholder="ldaps://ad.empresa.local:636"
+                  style="font-family: monospace" />
+              </CCol>
+              <CCol :md="5">
+                <CFormLabel class="small fw-semibold mb-1">Formato del usuario</CFormLabel>
+                <CFormInput size="sm" v-model.trim="ldapForm.bindTemplate" placeholder="DOMINIO\{username}"
+                  style="font-family: monospace" />
+              </CCol>
+              <CCol :md="4" class="d-flex flex-column gap-1">
+                <CFormCheck v-model="ldapForm.startTls" label="Usar StartTLS" :disabled="isLdaps" />
+                <CFormCheck v-model="ldapForm.tlsVerify" label="Validar el certificado" :disabled="formInsecure" />
+              </CCol>
+              <CCol :md="3">
+                <CFormLabel class="small fw-semibold mb-1">Tiempo máximo (ms)</CFormLabel>
+                <CFormInput size="sm" type="number" v-model.number="ldapForm.timeoutMs" min="1000" max="60000" />
+              </CCol>
+              <CCol :md="12">
+                <CFormLabel class="small fw-semibold mb-1">
+                  Certificado de la CA <span class="text-medium-emphasis fw-normal">(PEM, opcional)</span>
+                </CFormLabel>
+                <CFormTextarea size="sm" rows="3" v-model.trim="ldapForm.caCert" :disabled="formInsecure"
+                  placeholder="-----BEGIN CERTIFICATE-----" style="font-family: monospace; font-size: 11px" />
+              </CCol>
+            </CRow>
+            <CAlert v-if="ldapForm.url && formInsecure" color="warning" class="py-2 small mt-3 mb-0">
+              Conexión sin cifrar: la contraseña de dominio de cada usuario viajará en claro por la red.
+              Usa <code>ldaps://</code> o StartTLS si el servidor lo admite.
+            </CAlert>
+
+            <!-- Probar con los valores del formulario, aunque no estén guardados -->
+            <div class="fw-semibold small mt-4 mb-1">Probar conexión</div>
+            <p class="text-medium-emphasis mb-2" style="font-size: 12px">
+              Bind real con un usuario del dominio (por ejemplo, el tuyo) y los valores de arriba, sin guardarlos.
+              Queda en la auditoría. Funciona aunque LDAP esté desactivado.
+            </p>
+            <form class="row g-2 align-items-end" @submit.prevent="handleLdapTest">
+              <CCol :md="4">
+                <CFormLabel class="small mb-1">Usuario del dominio</CFormLabel>
+                <CFormInput size="sm" v-model="ldapTest.username" autocomplete="off" />
+              </CCol>
+              <CCol :md="4">
+                <CFormLabel class="small mb-1">Contraseña</CFormLabel>
+                <CFormInput size="sm" type="password" v-model="ldapTest.password" autocomplete="off" />
+              </CCol>
+              <CCol :md="4">
+                <CButton type="submit" color="secondary" variant="outline" size="sm"
+                  :disabled="ldapTesting || !ldapTest.username || !ldapTest.password || !ldapForm.url">
+                  <CSpinner v-if="ldapTesting" size="sm" /><template v-else>Probar</template>
+                </CButton>
+              </CCol>
+            </form>
+            <CAlert v-if="ldapTestResult" :color="ldapTestResult.success ? 'success' : 'danger'"
+              class="py-2 small mt-2 mb-0">{{ ldapTestResult.message }}</CAlert>
+
+            <!-- Guardar: reconfirmación con contraseña y segundo factor -->
+            <div class="fw-semibold small mt-4 mb-1">Guardar cambios</div>
+            <CAlert v-if="!ldap.canSave" color="info" class="py-2 small mb-0">
+              Para cambiar la conexión LDAP necesitas tener activado el segundo factor (Mi Perfil).
+            </CAlert>
+            <template v-else>
+              <p class="text-medium-emphasis mb-2" style="font-size: 12px">
+                Confirma tu identidad para guardar. El cambio queda en la auditoría con el valor anterior y el nuevo.
+              </p>
+              <form class="row g-2 align-items-end" @submit.prevent="handleLdapSave">
+                <CCol :md="4">
+                  <CFormLabel class="small mb-1">Tu contraseña</CFormLabel>
+                  <CFormInput size="sm" type="password" v-model="ldapReauth.password" autocomplete="current-password" />
+                </CCol>
+                <CCol :md="4">
+                  <CFormLabel class="small mb-1">Código del segundo factor</CFormLabel>
+                  <CFormInput size="sm" v-model="ldapReauth.code" placeholder="000000" autocomplete="one-time-code"
+                    style="font-family: monospace" />
+                </CCol>
+                <CCol :md="4" class="d-flex gap-2">
+                  <CButton type="submit" :color="ldapSaved ? 'success' : 'primary'" size="sm"
+                    :disabled="ldapSaving || !ldapDirty || !ldapReauth.password || !ldapReauth.code">
+                    <CSpinner v-if="ldapSaving" size="sm" />
+                    <template v-else-if="ldapSaved"><Check :size="14" class="me-1" /> Guardado</template>
+                    <template v-else>Guardar</template>
+                  </CButton>
+                  <CButton v-if="ldapDirty && !ldapSaving" color="secondary" variant="ghost" size="sm"
+                    title="Descartar cambios" @click="resetLdapForm">
+                    <X :size="14" />
+                  </CButton>
+                </CCol>
+              </form>
+              <CAlert v-if="ldapSaveError" color="danger" class="py-2 small mt-2 mb-0">{{ ldapSaveError }}</CAlert>
+            </template>
+          </CCardBody>
+        </CCard>
+
         <!-- Límites de peticiones: solo lectura. Se fijan en backend/.env o en el
              código, no aquí (ver backend/src/config/rateLimits.js). -->
         <CCard v-if="limits.length" class="shadow-sm mb-4">
@@ -204,6 +315,69 @@ const savedKeys   = ref(new Set())
 const saving      = ref(null)
 const limits       = ref([])
 const windowSource = ref('RATE_LIMIT_WINDOW_MS')
+// ─── Directorio LDAP ─────────────────────────────────────────────────────────
+const LDAP_FIELDS = ['url', 'bindTemplate', 'startTls', 'tlsVerify', 'caCert', 'timeoutMs']
+const ldap           = ref(null)
+const ldapForm       = reactive({ url: '', bindTemplate: '', startTls: false, tlsVerify: true, caCert: '', timeoutMs: 5000 })
+const ldapTest       = reactive({ username: '', password: '' })
+const ldapReauth     = reactive({ password: '', code: '' })
+const ldapTesting    = ref(false)
+const ldapTestResult = ref(null)
+const ldapSaving     = ref(false)
+const ldapSaveError  = ref(null)
+const ldapSaved      = ref(false)
+
+const isLdaps      = computed(() => ldapForm.url.toLowerCase().startsWith('ldaps://'))
+const formInsecure = computed(() => !isLdaps.value && !ldapForm.startTls)
+const ldapDirty    = computed(() => ldap.value && LDAP_FIELDS.some((f) => ldapForm[f] !== ldap.value[f]))
+
+function ldapConfigPayload() {
+  return {
+    url: ldapForm.url, bindTemplate: ldapForm.bindTemplate,
+    // StartTLS no aplica a ldaps://: se envía coherente con lo que se muestra.
+    startTls: isLdaps.value ? false : ldapForm.startTls,
+    tlsVerify: ldapForm.tlsVerify, caCert: ldapForm.caCert, timeoutMs: Number(ldapForm.timeoutMs),
+  }
+}
+
+function resetLdapForm() {
+  if (ldap.value) for (const f of LDAP_FIELDS) ldapForm[f] = ldap.value[f]
+  ldapSaveError.value = null
+}
+
+// Si falla, la tarjeta no se muestra: el resto de la página sigue funcionando.
+async function loadLdap() {
+  try { ldap.value = (await api.get('/system/ldap')).ldap; resetLdapForm() } catch { ldap.value = null }
+}
+
+async function handleLdapTest() {
+  ldapTesting.value = true; ldapTestResult.value = null
+  try {
+    // Un fallo de credenciales llega como 200 con success: false.
+    const r = await api.post('/system/ldap/test', { ...ldapTest, config: ldapConfigPayload() })
+    ldapTestResult.value = { success: r.success === true, message: r.message }
+  } catch (err) {
+    ldapTestResult.value = { success: false, message: err?.message || 'Error al probar la conexión.' }
+  } finally {
+    ldapTest.password = ''
+    ldapTesting.value = false
+  }
+}
+
+async function handleLdapSave() {
+  ldapSaving.value = true; ldapSaveError.value = null
+  try {
+    await api.put('/system/ldap', { config: ldapConfigPayload(), ...ldapReauth })
+    await loadLdap()
+    ldapSaved.value = true
+    setTimeout(() => { ldapSaved.value = false }, 2500)
+  } catch (err) {
+    ldapSaveError.value = err?.message || 'Error al guardar la conexión LDAP.'
+  } finally {
+    ldapReauth.password = ''; ldapReauth.code = ''
+    ldapSaving.value = false
+  }
+}
 
 function formatWindow(min) {
   return min % 60 === 0 ? `${min / 60} h` : `${min} min`
@@ -258,6 +432,7 @@ async function handleSave(setting) {
     if (['timezone', 'locale', 'app_name'].includes(setting.key)) {
       settingsStore.refresh()
     }
+    if (setting.key === 'ldap_enabled') loadLdap()
   } catch (err) {
     saveErrors[setting.key] = err?.message || 'Error al guardar.'
   } finally {
@@ -265,5 +440,5 @@ async function handleSave(setting) {
   }
 }
 
-onMounted(() => { loadSettings(); loadLimits() })
+onMounted(() => { loadSettings(); loadLimits(); loadLdap() })
 </script>

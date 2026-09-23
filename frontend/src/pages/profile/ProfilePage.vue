@@ -55,8 +55,17 @@
             </CCardBody>
           </CCard>
 
-          <!-- Sección 2: Cambio de contraseña -->
-          <CCard class="shadow-sm mb-4">
+          <!-- Sección 2: Cambio de contraseña. Un usuario LDAP usa la del dominio. -->
+          <CCard v-if="profile.auth_source === 'LDAP'" class="shadow-sm mb-4">
+            <CCardHeader class="py-2">
+              <span class="fw-semibold small">Contraseña</span>
+            </CCardHeader>
+            <CCardBody class="small text-medium-emphasis">
+              Entras con tu <strong>contraseña de dominio</strong> (Active Directory). Para cambiarla,
+              hazlo en el directorio, como en el resto de sistemas de la empresa: ICM no la guarda.
+            </CCardBody>
+          </CCard>
+          <CCard v-else class="shadow-sm mb-4">
             <CCardHeader class="py-2">
               <span class="fw-semibold small">Cambiar contraseña</span>
             </CCardHeader>

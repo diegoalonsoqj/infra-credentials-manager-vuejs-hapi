@@ -75,6 +75,8 @@
                     <div class="fw-medium d-flex align-items-center gap-2">
                       {{ u.username }}
                       <ShieldCheck v-if="u.mfa_enabled" :size="13" class="text-success" title="Segundo factor activado" />
+                      <CBadge v-if="u.auth_source === 'LDAP'" color="info" style="font-size: 10px"
+                        title="Entra con su contraseña de dominio">LDAP</CBadge>
                     </div>
                     <div class="text-medium-emphasis" style="font-size: 11px">{{ u.first_name }} {{ u.last_name }}</div>
                     <CBadge v-if="u.locked_until && new Date(u.locked_until) > new Date()"
@@ -106,7 +108,9 @@
                         @click="handleToggle(u)">
                         <PowerOff v-if="u.estado === 'AI'" :size="13" /><Power v-else :size="13" />
                       </CButton>
-                      <CButton size="sm" color="info" variant="outline" title="Resetear contraseña" @click="openModal('reset-pwd', u)">
+                      <!-- La contraseña de un usuario LDAP se resetea en el directorio -->
+                      <CButton v-if="u.auth_source !== 'LDAP'" size="sm" color="info" variant="outline"
+                        title="Resetear contraseña" @click="openModal('reset-pwd', u)">
                         <KeyRound :size="13" />
                       </CButton>
                       <CButton v-if="u.locked_until && new Date(u.locked_until) > new Date()"
@@ -162,7 +166,7 @@
         <CAlert v-if="catalogsError" color="warning" class="py-2 small mb-3">
           {{ catalogsError }}
         </CAlert>
-        <UserForm :roles="roles" :teams="teams" :is-edit="false"
+        <UserForm :roles="roles" :teams="teams" :ldap="ldap" :is-edit="false"
           :loading="modalLoading" :error="modalError"
           @save="handleCreate" @cancel="closeModal" />
       </CModalBody>
@@ -173,7 +177,7 @@
       <CModalHeader><CModalTitle>Editar usuario — {{ selectedUser?.username }}</CModalTitle></CModalHeader>
       <CModalBody>
         <UserForm v-if="selectedUser" :key="selectedUser.id"
-          :initial="selectedUser" :roles="roles" :teams="teams" :is-edit="true"
+          :initial="selectedUser" :roles="roles" :teams="teams" :ldap="ldap" :is-edit="true"
           :loading="modalLoading" :error="modalError"
           @save="handleUpdate" @cancel="closeModal" />
       </CModalBody>
@@ -255,6 +259,7 @@ const filters  = reactive({ ...EMPTY_FILTERS })
 const applied  = reactive({ ...EMPTY_FILTERS })
 const roles    = ref([])
 const teams    = ref([])
+const ldap     = ref({ configured: false, enabled: false })
 const loading  = ref(true)
 const error    = ref(null)
 const toast    = ref(null)
@@ -388,7 +393,10 @@ watch(limit, () => { page.value = 1; loadUsers() })
 onMounted(() => {
   loadUsers()
   api.get('/admin/users/catalogs')
-    .then(data => { roles.value = data.roles; teams.value = data.teams })
+    .then(data => {
+      roles.value = data.roles; teams.value = data.teams
+      if (data.ldap) ldap.value = data.ldap
+    })
     .catch(err => { catalogsError.value = err?.message || 'Error al cargar roles y equipos.' })
 })
 </script>

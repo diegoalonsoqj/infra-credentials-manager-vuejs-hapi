@@ -137,6 +137,11 @@ const AUDIT_ACTIONS = Object.freeze({
 
   // Configuración del sistema
   SETTING_UPDATE: 'SETTING_UPDATE',
+  // Prueba de conexión LDAP desde Configuración: es un bind real contra AD.
+  LDAP_TEST:      'LDAP_TEST',
+  // Cambio de la conexión LDAP (exige contraseña y segundo factor). Se registra
+  // también el intento fallido: repetirlo es señal de una sesión robada.
+  LDAP_CONFIG_UPDATE: 'LDAP_CONFIG_UPDATE',
 
   // Recursos — Bases de datos
   RESOURCE_DB_CREATE:          'RESOURCE_DB_CREATE',

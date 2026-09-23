@@ -62,6 +62,7 @@ const SESSION_QUERY = `
     u.locked_until,
     u.force_pwd_change,
     u.mfa_enabled,
+    u.auth_source,
     r.code      AS role,
     r.id        AS role_id,
     r.level     AS role_level,
@@ -86,7 +87,7 @@ const SESSION_QUERY = `
     AND s.expires_at > NOW()
   GROUP BY s.id, u.id, u.username, u.first_name, u.last_name, u.full_name,
            u.estado, u.estado_registro, u.locked_until, u.force_pwd_change, u.mfa_enabled,
-           r.code, r.id, r.level, t.code`;
+           u.auth_source, r.code, r.id, r.level, t.code`;
 
 /**
  * Comparacion de dos secretos en tiempo constante.
@@ -213,6 +214,7 @@ async function authenticate(request, h) {
         // sesión solo puede cambiar la contraseña.
         forcePwdChange:    session.force_pwd_change === true,
         mfaEnabled:        session.mfa_enabled === true,
+        authSource:        session.auth_source || 'LOCAL',
       },
     });
   } catch (err) {

@@ -22,6 +22,8 @@
 // - Limpia failed_attempts y locked_until (desbloquea la cuenta)
 // - Marca force_pwd_change para que el usuario deba cambiarla al entrar,
 //   igual que hace el reseteo desde el panel de administración
+// - Si el usuario era LDAP, lo pasa a LOCAL: es la salida de emergencia cuando
+//   el directorio no responde y no queda ningún administrador que pueda entrar
 // =============================================================================
 
 const path = require('path');
@@ -83,7 +85,7 @@ async function main() {
     // Sin username: listar administradores y salir.
     if (!username) {
       const { rows } = await pool.query(
-        `SELECT u.username, u.email, r.code AS role, u.estado
+        `SELECT u.username, u.email, r.code AS role, u.estado, u.auth_source
            FROM sch_system.tbl_users u
            JOIN sch_system.tbl_roles r ON r.id = u.role_id
           WHERE r.code = 'ADMIN' AND u.estado_registro = 'O'
@@ -94,7 +96,7 @@ async function main() {
         console.log('  (ninguno)');
       } else {
         rows.forEach((r) =>
-          console.log(`  - ${r.username}  <${r.email}>  estado=${r.estado}`)
+          console.log(`  - ${r.username}  <${r.email}>  estado=${r.estado}  origen=${r.auth_source}`)
         );
       }
       console.log('\nUso: node scripts/reset-admin-password.js <username>');
@@ -128,18 +130,22 @@ async function main() {
 
     const hash = await bcrypt.hash(newPassword, BCRYPT_FACTOR);
 
-    const { rowCount } = await pool.query(
-      `UPDATE sch_system.tbl_users
+    const { rows: updated } = await pool.query(
+      `UPDATE sch_system.tbl_users u
           SET password_hash    = $1,
+              auth_source      = 'LOCAL',
               failed_attempts  = 0,
               locked_until     = NULL,
               force_pwd_change = TRUE,
               updated_at       = NOW()
-        WHERE username = $2 AND estado_registro = 'O'`,
+         FROM (SELECT id, auth_source FROM sch_system.tbl_users
+                WHERE username = $2 AND estado_registro = 'O') prev
+        WHERE u.id = prev.id
+        RETURNING prev.auth_source AS previous_source`,
       [hash, username]
     );
 
-    if (rowCount === 0) {
+    if (updated.length === 0) {
       console.error(`\n✗ No se encontró un usuario activo con username "${username}".\n`);
       process.exitCode = 1;
       return;
@@ -147,7 +153,10 @@ async function main() {
 
     console.log(
       `\n✓ Contraseña actualizada para "${username}". Cuenta desbloqueada.\n` +
-      '  Deberá cambiarla en el primer inicio de sesión.\n'
+      '  Deberá cambiarla en el primer inicio de sesión.\n' +
+      (updated[0].previous_source === 'LDAP'
+        ? '  Era un usuario LDAP: ahora usa contraseña local de ICM.\n'
+        : '')
     );
   } catch (err) {
     console.error('\n✗ Error:', err.message, '\n');
