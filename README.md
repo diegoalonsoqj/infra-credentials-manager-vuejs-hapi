@@ -215,6 +215,9 @@ publicarla necesitas **HTTPS**, y la forma habitual es un proxy inverso delante:
 adaptar. Con proxy delante hay que poner `TRUST_PROXY=1` y `HTTPS_ENABLED=true`,
 o las cabeceras de seguridad y la IP registrada en la auditoría serán incorrectas.
 
+**En Google Compute Engine con PM2:** ver
+[`deploy/DESPLIEGUE-GCP.md`](./deploy/DESPLIEGUE-GCP.md).
+
 > Antes de exponerla a internet: base de datos accesible solo desde el servidor
 > de la aplicación, contraseña de PostgreSQL propia y robusta, Master Key
 > custodiada fuera de ese servidor y, a ser posible, una VPN por delante.
