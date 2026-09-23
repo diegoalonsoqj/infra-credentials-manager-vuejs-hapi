@@ -42,6 +42,29 @@ const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NEWLINE_RE = /[\r\n]/;
 
 /**
+ * Devuelve el valor tal como debe escribirse para que dotenv lo lea igual.
+ *
+ * Sin comillas, dotenv corta el valor en el primer '#' (lo toma por comentario),
+ * recorta los espacios de los extremos y quita unas comillas que lo envuelvan.
+ * Una contrasena de BD como "abc#def" se leia como "abc": la instalacion
+ * terminaba bien y el primer login fallaba con 28P01. En la Master Key seria
+ * peor: tras reiniciar, ninguna credencial se podria descifrar.
+ *
+ * Entre comillas simples o backticks dotenv no interpreta nada (las dobles si:
+ * expanden \n), asi que se usa la primera que no aparezca dentro del valor.
+ *
+ * @param {string} value
+ * @returns {string|null} Valor listo para escribir, o null si no hay forma.
+ */
+function formatEnvValue(value) {
+  const needsQuotes = value !== value.trim() || value.includes('#') || /^['"`]/.test(value);
+  if (!needsQuotes) return value;
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('`')) return `\`${value}\``;
+  return null;
+}
+
+/**
  * Rechaza los valores que romperian el formato "una variable por linea".
  *
  * ESTO NO ES COSMETICO. Tres de los valores que se escriben aqui vienen de una
@@ -73,7 +96,8 @@ const NEWLINE_RE = /[\r\n]/;
  * @throws {Error} con code 'ENV_VALUE_INVALID' si la pareja no es escribible.
  */
 function isEnvSafeValue(value) {
-  return !NEWLINE_RE.test(String(value));
+  const str = String(value);
+  return !NEWLINE_RE.test(str) && formatEnvValue(str) !== null;
 }
 
 function assertWritablePair(key, value) {
@@ -84,7 +108,8 @@ function assertWritablePair(key, value) {
   }
   if (!isEnvSafeValue(value)) {
     const err = new Error(
-      `El valor de ${key} no puede contener saltos de linea: romperia el formato del archivo .env.`
+      `El valor de ${key} no puede contener saltos de linea, ni comilla simple y backtick ` +
+      'a la vez cuando necesita comillas: romperia el formato del archivo .env.'
     );
     err.code = 'ENV_VALUE_INVALID';
     throw err;
@@ -108,6 +133,7 @@ function applyUpdates(content, updates, sectionComment) {
 
   // Antes de tocar nada: o se puede escribir todo, o no se escribe nada.
   for (const [k, v] of pending) assertWritablePair(k, v);
+  for (const [k, v] of pending) pending.set(k, formatEnvValue(v));
 
   // Un archivo vacio da [''] al partir por '\n', y eso sembraria una linea en
   // blanco al principio del .env recien creado.
