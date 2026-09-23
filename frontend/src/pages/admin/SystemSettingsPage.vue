@@ -127,8 +127,11 @@
               </CCol>
               <CCol :md="5">
                 <CFormLabel class="small fw-semibold mb-1">Formato del usuario</CFormLabel>
-                <CFormInput size="sm" v-model.trim="ldapForm.bindTemplate" placeholder="DOMINIO\{username}"
+                <CFormInput size="sm" v-model.trim="ldapForm.bindTemplate" placeholder="ej: EMPRESA\{username}"
                   style="font-family: monospace" />
+                <div class="text-medium-emphasis mt-1" style="font-size: 11px">
+                  Escribe tu dominio seguido de <code>\{username}</code>, o <code>{username}@dominio.local</code>.
+                </div>
               </CCol>
               <CCol :md="4" class="d-flex flex-column gap-1">
                 <CFormCheck v-model="ldapForm.startTls" label="Usar StartTLS" :disabled="isLdaps" />
@@ -160,7 +163,8 @@
             <form class="row g-2 align-items-end" @submit.prevent="handleLdapTest">
               <CCol :md="4">
                 <CFormLabel class="small mb-1">Usuario del dominio</CFormLabel>
-                <CFormInput size="sm" v-model="ldapTest.username" autocomplete="off" />
+                <CFormInput size="sm" v-model.trim="ldapTest.username" autocomplete="off" placeholder="ej: jperez" />
+                <div class="text-medium-emphasis mt-1" style="font-size: 11px">Solo el usuario, sin el dominio.</div>
               </CCol>
               <CCol :md="4">
                 <CFormLabel class="small mb-1">Contraseña</CFormLabel>
@@ -340,6 +344,11 @@ function ldapConfigPayload() {
   }
 }
 
+// Los errores de validación llegan en errors[0].msg, no en message.
+function errorText(err, fallback) {
+  return err?.message || err?.errors?.[0]?.msg || fallback
+}
+
 function resetLdapForm() {
   if (ldap.value) for (const f of LDAP_FIELDS) ldapForm[f] = ldap.value[f]
   ldapSaveError.value = null
@@ -357,7 +366,7 @@ async function handleLdapTest() {
     const r = await api.post('/system/ldap/test', { ...ldapTest, config: ldapConfigPayload() })
     ldapTestResult.value = { success: r.success === true, message: r.message }
   } catch (err) {
-    ldapTestResult.value = { success: false, message: err?.message || 'Error al probar la conexión.' }
+    ldapTestResult.value = { success: false, message: errorText(err, 'Error al probar la conexión.') }
   } finally {
     ldapTest.password = ''
     ldapTesting.value = false
@@ -372,7 +381,7 @@ async function handleLdapSave() {
     ldapSaved.value = true
     setTimeout(() => { ldapSaved.value = false }, 2500)
   } catch (err) {
-    ldapSaveError.value = err?.message || 'Error al guardar la conexión LDAP.'
+    ldapSaveError.value = errorText(err, 'Error al guardar la conexión LDAP.')
   } finally {
     ldapReauth.password = ''; ldapReauth.code = ''
     ldapSaving.value = false

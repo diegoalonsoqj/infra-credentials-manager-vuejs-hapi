@@ -36,7 +36,7 @@ const ldapConfigSchema = Joi.object({
 
 const ldapTestSchema = Joi.object({
   username: Joi.string().trim().min(1).max(50).pattern(/^[a-zA-Z0-9._-]+$/).required()
-    .messages(M('Usuario de dominio no válido.')),
+    .messages(M('Escribe solo el usuario, sin el dominio (ej: jperez): el dominio lo añade el formato del usuario.')),
   password: Joi.string().min(1).max(256).required().messages(M('La contraseña es requerida.')),
   // Configuración del formulario, sin guardar: se prueba antes de guardarla.
   config:   ldapConfigSchema.optional(),
