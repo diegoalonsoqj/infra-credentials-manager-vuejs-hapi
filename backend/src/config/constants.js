@@ -17,19 +17,21 @@ const TEAMS = Object.freeze({
   DBA:     'DBA',
   SYSADMIN: 'SYSADMIN',
   APPOPS:  'APPOPS',
+  NETOPS:  'NETOPS',
 });
 
 const RESOURCE_TYPES = Object.freeze({
   DB:  'DB',
   OS:  'OS',
   APP: 'APP',
+  NET: 'NET',
 });
 
 // Permisos del sistema. Usar estas constantes en requirePermission() y en el frontend.
 const PERMISSIONS = Object.freeze({
   // Herramientas
   MOD_PWDGEN:   'MOD_PWDGEN',
-  // Credenciales (filtradas por ámbito de equipo: DB/OS/APP)
+  // Credenciales (filtradas por ámbito de equipo: DB/OS/APP/NET)
   CRED_VIEW:    'CRED_VIEW',
   CRED_EDIT:    'CRED_EDIT',
   CRED_DELETE:  'CRED_DELETE',
@@ -163,6 +165,11 @@ const AUDIT_ACTIONS = Object.freeze({
   RESOURCE_APP_CREATE: 'RESOURCE_APP_CREATE',
   RESOURCE_APP_UPDATE: 'RESOURCE_APP_UPDATE',
   RESOURCE_APP_DELETE: 'RESOURCE_APP_DELETE',
+
+  // Recursos — Dispositivos de red
+  RESOURCE_NET_CREATE: 'RESOURCE_NET_CREATE',
+  RESOURCE_NET_UPDATE: 'RESOURCE_NET_UPDATE',
+  RESOURCE_NET_DELETE: 'RESOURCE_NET_DELETE',
 });
 
 module.exports = {

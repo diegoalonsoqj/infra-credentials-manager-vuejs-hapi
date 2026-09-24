@@ -97,6 +97,7 @@ async function withActiveMasterKey(fn) {
 //   server_id     → tbl_servers      (resource_type = 'OS')
 //   db_service_id → tbl_db_services  (resource_type = 'DB')
 //   application_id → tbl_applications (resource_type = 'APP')
+//   network_device_id → tbl_network_devices (resource_type = 'NET', migración 019)
 //   XOR: exactamente uno debe ser NOT NULL.
 // =============================================================================
 
@@ -150,6 +151,22 @@ async function findAvailableApplications() {
   return rows;
 }
 
+async function findAvailableNetworkDevices() {
+  const { rows } = await query(
+    `SELECT
+       n.id, n.code, n.name, n.host, n.port, n.estado,
+       e.id   AS environment_id, e.code AS environment_code,
+       e.name AS environment_name, e.prd_flag, e.sort_order,
+       np.code AS product_code, np.name AS product_name
+     FROM sch_system.tbl_network_devices n
+     JOIN sch_system.tbl_environment e ON e.id = n.environment_id
+     LEFT JOIN sch_system.tbl_cat_network_product np ON np.id = n.product_id
+     WHERE n.estado_registro = 'O' AND n.estado = 'AI'
+     ORDER BY e.sort_order, n.name`
+  );
+  return rows;
+}
+
 // Instancia activa para el alta de credenciales: el código y la marca de PRD
 // van a la auditoría del alta, igual que en el resto de eventos.
 async function findDbServiceById(id) {
@@ -185,6 +202,17 @@ async function findApplicationById(id) {
   return rows[0] || null;
 }
 
+async function findNetworkDeviceById(id) {
+  const { rows } = await query(
+    `SELECT n.id, n.code, e.prd_flag
+       FROM sch_system.tbl_network_devices n
+       JOIN sch_system.tbl_environment e ON e.id = n.environment_id
+      WHERE n.id = $1 AND n.estado_registro = 'O' AND n.estado = 'AI'`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
 async function findActiveUsers() {
   const { rows } = await query(
     `SELECT u.id, u.username, u.full_name, r.code AS role, t.code AS team
@@ -208,7 +236,7 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
   const { rows } = await query(
     `SELECT
        c.id, c.resource_type,
-       c.server_id, c.db_service_id, c.application_id,
+       c.server_id, c.db_service_id, c.application_id, c.network_device_id,
        c.username, c.description, c.notes,
        c.is_custodied, c.custodian_user_id,
        cu.username  AS custodian_username,
@@ -222,10 +250,12 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
        eng.code AS engine_code, eng.name AS engine_name,
        -- Aplicación
        a.code AS app_code, a.name AS app_name, a.app_type, a.url AS app_url,
+       -- Dispositivo de red
+       n.code AS net_code, n.name AS net_name, n.host AS net_host, n.port AS net_port,
        -- Ambiente (desnormalizado del recurso referenciado)
-       COALESCE(es.code,  ed.code,  ea.code)     AS environment_code,
-       COALESCE(es.name,  ed.name,  ea.name)     AS environment_name,
-       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag) AS prd_flag
+       COALESCE(es.code,  ed.code,  ea.code,  en.code)     AS environment_code,
+       COALESCE(es.name,  ed.name,  ea.name,  en.name)     AS environment_name,
+       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, en.prd_flag) AS prd_flag
      FROM sch_secret.tbl_credentials c
      LEFT JOIN sch_system.tbl_servers        s   ON s.id   = c.server_id
      LEFT JOIN sch_system.tbl_environment    es  ON es.id  = s.environment_id
@@ -234,6 +264,8 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
      LEFT JOIN sch_system.tbl_cat_db_engine  eng ON eng.id = d.engine_id
      LEFT JOIN sch_system.tbl_applications   a   ON a.id   = c.application_id
      LEFT JOIN sch_system.tbl_environment    ea  ON ea.id  = a.environment_id
+     LEFT JOIN sch_system.tbl_network_devices n  ON n.id   = c.network_device_id
+     LEFT JOIN sch_system.tbl_environment    en  ON en.id  = n.environment_id
      LEFT JOIN sch_system.tbl_users          cu  ON cu.id  = c.custodian_user_id
      WHERE c.estado_registro = 'O'
        AND ($3::text[] IS NULL OR c.resource_type = ANY($3::text[]))
@@ -241,15 +273,16 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
          LOWER(c.username) LIKE $4 OR
          LOWER(s.code)     LIKE $4 OR LOWER(s.name) LIKE $4 OR
          LOWER(d.code)     LIKE $4 OR LOWER(d.name) LIKE $4 OR
-         LOWER(a.code)     LIKE $4 OR LOWER(a.name) LIKE $4
+         LOWER(a.code)     LIKE $4 OR LOWER(a.name) LIKE $4 OR
+         LOWER(n.code)     LIKE $4 OR LOWER(n.name) LIKE $4
        ))
-       AND ($5::int IS NULL OR COALESCE(s.environment_id, d.environment_id, a.environment_id) = $5)
+       AND ($5::int IS NULL OR COALESCE(s.environment_id, d.environment_id, a.environment_id, n.environment_id) = $5)
        AND ($6::text IS NULL OR c.resource_type = $6)
        AND ($7::boolean IS NULL OR c.is_custodied = $7)
        AND ($8::text IS NULL OR c.estado = $8)
      ORDER BY
-       COALESCE(es.sort_order, ed.sort_order, ea.sort_order) NULLS LAST,
-       COALESCE(s.name, d.name, a.name) NULLS LAST
+       COALESCE(es.sort_order, ed.sort_order, ea.sort_order, en.sort_order) NULLS LAST,
+       COALESCE(s.name, d.name, a.name, n.name) NULLS LAST
      LIMIT $1 OFFSET $2`,
     [limit, offset, resourceTypes, searchParam, environmentId || null, filterResourceType || null, custodied != null ? custodied : null, estado || null]
   );
@@ -260,15 +293,17 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
      LEFT JOIN sch_system.tbl_servers      s ON s.id = c.server_id
      LEFT JOIN sch_system.tbl_db_services  d ON d.id = c.db_service_id
      LEFT JOIN sch_system.tbl_applications a ON a.id = c.application_id
+     LEFT JOIN sch_system.tbl_network_devices n ON n.id = c.network_device_id
      WHERE c.estado_registro = 'O'
        AND ($1::text[] IS NULL OR c.resource_type = ANY($1::text[]))
        AND ($2::text IS NULL OR (
          LOWER(c.username) LIKE $2 OR
          LOWER(s.code) LIKE $2 OR LOWER(s.name) LIKE $2 OR
          LOWER(d.code) LIKE $2 OR LOWER(d.name) LIKE $2 OR
-         LOWER(a.code) LIKE $2 OR LOWER(a.name) LIKE $2
+         LOWER(a.code) LIKE $2 OR LOWER(a.name) LIKE $2 OR
+         LOWER(n.code) LIKE $2 OR LOWER(n.name) LIKE $2
        ))
-       AND ($3::int IS NULL OR COALESCE(s.environment_id, d.environment_id, a.environment_id) = $3)
+       AND ($3::int IS NULL OR COALESCE(s.environment_id, d.environment_id, a.environment_id, n.environment_id) = $3)
        AND ($4::text IS NULL OR c.resource_type = $4)
        AND ($5::boolean IS NULL OR c.is_custodied = $5)
        AND ($6::text IS NULL OR c.estado = $6)`,
@@ -282,7 +317,7 @@ async function findById(id) {
   const { rows } = await query(
     `SELECT
        c.id, c.resource_type,
-       c.server_id, c.db_service_id, c.application_id,
+       c.server_id, c.db_service_id, c.application_id, c.network_device_id,
        c.username, c.description, c.notes,
        c.is_custodied, c.custodian_user_id,
        cu.username  AS custodian_username,
@@ -293,9 +328,10 @@ async function findById(id) {
        d.code AS db_code, d.name AS db_name, d.host AS db_host, d.port AS db_port,
        eng.code AS engine_code, eng.name AS engine_name,
        a.code AS app_code, a.name AS app_name, a.app_type, a.url AS app_url,
-       COALESCE(es.code,  ed.code,  ea.code)     AS environment_code,
-       COALESCE(es.name,  ed.name,  ea.name)     AS environment_name,
-       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag) AS prd_flag
+       n.code AS net_code, n.name AS net_name, n.host AS net_host, n.port AS net_port,
+       COALESCE(es.code,  ed.code,  ea.code,  en.code)     AS environment_code,
+       COALESCE(es.name,  ed.name,  ea.name,  en.name)     AS environment_name,
+       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, en.prd_flag) AS prd_flag
      FROM sch_secret.tbl_credentials c
      LEFT JOIN sch_system.tbl_servers        s   ON s.id   = c.server_id
      LEFT JOIN sch_system.tbl_environment    es  ON es.id  = s.environment_id
@@ -304,6 +340,8 @@ async function findById(id) {
      LEFT JOIN sch_system.tbl_cat_db_engine  eng ON eng.id = d.engine_id
      LEFT JOIN sch_system.tbl_applications   a   ON a.id   = c.application_id
      LEFT JOIN sch_system.tbl_environment    ea  ON ea.id  = a.environment_id
+     LEFT JOIN sch_system.tbl_network_devices n  ON n.id   = c.network_device_id
+     LEFT JOIN sch_system.tbl_environment    en  ON en.id  = n.environment_id
      LEFT JOIN sch_system.tbl_users          cu  ON cu.id  = c.custodian_user_id
      WHERE c.id = $1 AND c.estado_registro = 'O'`,
     [id]
@@ -330,7 +368,7 @@ async function decryptPassword(id, masterKey) {
 // ---------------------------------------------------------------------------
 
 async function create({
-  serverId, dbServiceId, applicationId, resourceType, username,
+  serverId, dbServiceId, applicationId, networkDeviceId, resourceType, username,
   plainPassword, description, notes,
   isCustodied, custodianUserId, createdBy,
 }) {
@@ -341,11 +379,11 @@ async function create({
           username, password_encrypted,
           description, notes,
           is_custodied, custodian_user_id, custodian_since,
-          estado_registro, estado, created_by)
+          estado_registro, estado, created_by, network_device_id)
        VALUES ($1, $2, $3, $4, $5, ${encryptQuery(6, 7)},
                $8, $9,
                $10, $11, $12,
-               'O', 'AI', $13)
+               'O', 'AI', $13, $14)
        RETURNING id, username, resource_type`,
       [
         serverId        || null,
@@ -360,6 +398,7 @@ async function create({
         custodianUserId || null,
         isCustodied ? new Date() : null,
         createdBy,
+        networkDeviceId || null,
       ]
     );
     return rows[0];
@@ -454,9 +493,11 @@ module.exports = {
   findAvailableDbServices,
   findAvailableServers,
   findAvailableApplications,
+  findAvailableNetworkDevices,
   findDbServiceById,
   findServerById,
   findApplicationById,
+  findNetworkDeviceById,
   findActiveUsers,
   findAll,
   findById,

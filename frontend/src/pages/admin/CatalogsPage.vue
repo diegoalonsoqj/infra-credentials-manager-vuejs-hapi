@@ -19,6 +19,7 @@
                 <option value="cat-server-products">Prod. Servidor</option>
                 <option value="cat-db-products">Prod. BD</option>
                 <option value="cat-db-engines">Motores BD</option>
+                <option value="cat-network-products">Prod. Red</option>
                 <option value="projects">Proyectos</option>
                 <option value="resource-types">Tipos Recurso</option>
               </CFormSelect>
@@ -36,6 +37,7 @@
               <CButton v-if="tab === 'cat-server-products'" color="primary" size="sm" @click="catServerRef?.openCreate()">+ Nuevo Producto servidor</CButton>
               <CButton v-if="tab === 'cat-db-products'" color="primary" size="sm" @click="catDbProductRef?.openCreate()">+ Nuevo Producto BD</CButton>
               <CButton v-if="tab === 'cat-db-engines'" color="primary" size="sm" @click="catDbEngineRef?.openCreate()">+ Nuevo Motor BD</CButton>
+              <CButton v-if="tab === 'cat-network-products'" color="primary" size="sm" @click="catNetworkProductRef?.openCreate()">+ Nuevo Producto de red</CButton>
               <CButton v-if="tab === 'projects'" color="primary" size="sm"
                 @click="Object.assign(projForm, EMPTY_PROJ); formError = null; showProjCreate = true">+ Nuevo proyecto</CButton>
             </div>
@@ -187,7 +189,7 @@
                 <CTableDataCell>
                   <div class="d-flex gap-1 flex-wrap">
                     <CBadge v-for="rt in (t.resource_types || [])" :key="rt"
-                      :color="rt === 'DB' ? 'info' : rt === 'OS' ? 'warning' : 'success'">{{ rt }}</CBadge>
+                      :color="TEAM_RT_COLORS[rt] || 'secondary'">{{ rt }}</CBadge>
                   </div>
                 </CTableDataCell>
                 <CTableDataCell>
@@ -226,6 +228,9 @@
         </template>
         <template v-else-if="tab === 'cat-db-engines'">
           <SimpleCatalogTab ref="catDbEngineRef" api-prefix="/catalogs/cat-db-engines" singular-label="Motor BD" />
+        </template>
+        <template v-else-if="tab === 'cat-network-products'">
+          <SimpleCatalogTab ref="catNetworkProductRef" api-prefix="/catalogs/cat-network-products" singular-label="Producto de red" />
         </template>
 
         <!-- TAB: Proyectos -->
@@ -282,7 +287,7 @@
               Cada equipo (<strong>Team</strong>) tiene asignado un tipo de recurso que determina qué clase de credenciales puede gestionar.
             </CAlert>
             <CRow class="g-3">
-              <CCol v-for="rt in RESOURCE_TYPES" :key="rt.code" :md="4">
+              <CCol v-for="rt in RESOURCE_TYPES" :key="rt.code" :md="6" :xl="3">
                 <CCard class="h-100 shadow-sm">
                   <CCardHeader class="py-2 d-flex align-items-center gap-2">
                     <CBadge :color="rt.color" style="font-size: 13px; padding: 4px 10px">{{ rt.code }}</CBadge>
@@ -512,9 +517,9 @@
               <CFormInput size="sm" placeholder="ej: DBA_CLOUD" v-model="teamForm.code" required /></CCol>
             <CCol :md="12">
               <CFormLabel class="small fw-semibold">Tipos de recurso * <span class="text-medium-emphasis fw-normal">(seleccionar al menos uno)</span></CFormLabel>
-              <div class="d-flex gap-3 mt-1">
-                <CFormCheck v-for="rt in ['DB','OS','APP']" :key="rt" :id="`create-rt-${rt}`"
-                  :label="rt === 'DB' ? 'DB — Bases de datos' : rt === 'OS' ? 'OS — Servidores' : 'APP — Aplicaciones'"
+              <div class="d-flex flex-wrap column-gap-3 mt-1">
+                <CFormCheck v-for="(label, rt) in TEAM_RT_LABELS" :key="rt" :id="`create-rt-${rt}`"
+                  :label="`${rt} — ${label}`"
                   :model-value="(teamForm.resourceTypes || []).includes(rt)"
                   @change="toggleTeamResourceType(teamForm, rt, $event.target.checked)" />
               </div>
@@ -543,9 +548,9 @@
               <CFormInput size="sm" :value="teamForm.code" disabled /></CCol>
             <CCol :md="12">
               <CFormLabel class="small fw-semibold">Tipos de recurso * <span class="text-medium-emphasis fw-normal">(seleccionar al menos uno)</span></CFormLabel>
-              <div class="d-flex gap-3 mt-1">
-                <CFormCheck v-for="rt in ['DB','OS','APP']" :key="rt" :id="`edit-rt-${rt}`"
-                  :label="rt === 'DB' ? 'DB — Bases de datos' : rt === 'OS' ? 'OS — Servidores' : 'APP — Aplicaciones'"
+              <div class="d-flex flex-wrap column-gap-3 mt-1">
+                <CFormCheck v-for="(label, rt) in TEAM_RT_LABELS" :key="rt" :id="`edit-rt-${rt}`"
+                  :label="`${rt} — ${label}`"
                   :model-value="(teamForm.resourceTypes || []).includes(rt)"
                   @change="toggleTeamResourceType(teamForm, rt, $event.target.checked)" />
               </div>
@@ -721,11 +726,18 @@ const ROLE_DEFAULT_PERMS = {
   OPERATOR: ['MOD_PWDGEN', 'CRED_VIEW', 'CRED_EDIT', 'CRED_DELETE', 'CRED_REVEAL', 'RES_VIEW', 'RES_EDIT', 'RES_DELETE'],
   ADMIN:    null,
 }
+// Mismos colores por tipo que las insignias de equipos (TEAM_RT_COLORS), las
+// credenciales y el dashboard: antes esta ficha pintaba DB del color que el
+// resto de la app usa para otro tipo.
 const RESOURCE_TYPES = [
-  { code: 'DB', label: 'Base de datos', color: 'primary', credential: 'Credenciales de BD', description: 'Equipos de bases de datos. Gestionan credenciales de acceso a instancias de BD.' },
-  { code: 'OS', label: 'Sistema operativo', color: 'success', credential: 'Credenciales de servidor', description: 'Equipos de infraestructura de servidores. Gestionan credenciales de acceso a sistemas operativos.' },
-  { code: 'APP', label: 'Aplicación', color: 'warning', credential: 'Credenciales de aplicación', description: 'Equipos de aplicaciones. Gestionan credenciales de acceso a aplicaciones.' },
+  { code: 'DB', label: 'Base de datos', color: 'info', credential: 'Credenciales de BD', description: 'Equipos de bases de datos. Gestionan credenciales de acceso a instancias de BD.' },
+  { code: 'OS', label: 'Sistema operativo', color: 'warning', credential: 'Credenciales de servidor', description: 'Equipos de infraestructura de servidores. Gestionan credenciales de acceso a sistemas operativos.' },
+  { code: 'APP', label: 'Aplicación', color: 'success', credential: 'Credenciales de aplicación', description: 'Equipos de aplicaciones. Gestionan credenciales de acceso a aplicaciones.' },
+  { code: 'NET', label: 'Networking', color: 'primary', credential: 'Credenciales de red', description: 'Equipos de redes. Gestionan credenciales de acceso a routers, switches, firewalls y demás dispositivos de red.' },
 ]
+// Casillas de tipos de recurso en el formulario de equipos, e insignias del listado.
+const TEAM_RT_LABELS = { DB: 'Bases de datos', OS: 'Servidores', APP: 'Aplicaciones', NET: 'Dispositivos de red' }
+const TEAM_RT_COLORS = { DB: 'info', OS: 'warning', APP: 'success', NET: 'primary' }
 
 const EMPTY_ENV   = { code: '', name: '', description: '', prdFlag: false, sortOrder: 0 }
 const EMPTY_INFRA = { code: '', name: '', description: '' }
@@ -753,6 +765,7 @@ const catOsRef        = ref(null)
 const catServerRef    = ref(null)
 const catDbProductRef = ref(null)
 const catDbEngineRef  = ref(null)
+const catNetworkProductRef = ref(null)
 
 // Modales
 const showEnvCreate   = ref(false); const showEnvEdit    = ref(false); const showEnvDelete   = ref(false)

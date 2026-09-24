@@ -47,6 +47,7 @@ function custodyImpactExtra(impact) {
 // "existen 3 instancias asociadas" el administrador tenía que buscarlas a mano.
 const USAGE_LABELS = {
   SERVER: 'servidor', DB_SERVICE: 'servicio de BD', APPLICATION: 'aplicación', PROJECT: 'proyecto',
+  NETWORK_DEVICE: 'dispositivo de red',
 };
 const USAGE_MAX_LISTED = 5;
 
@@ -367,7 +368,7 @@ async function deleteRole(id, actor) {
 
 async function listTeams() { return repo.findAllTeams(); }
 
-const VALID_RESOURCE_TYPES = ['DB', 'OS', 'APP'];
+const VALID_RESOURCE_TYPES = ['DB', 'OS', 'APP', 'NET'];
 
 function validateResourceTypes(resourceTypes) {
   if (!Array.isArray(resourceTypes) || resourceTypes.length === 0) {
@@ -625,6 +626,7 @@ const osSvc            = makeCatalogService(repo.osRepo,            'OS');
 const serverProductSvc = makeCatalogService(repo.serverProductRepo, 'ServerProduct');
 const dbProductSvc     = makeCatalogService(repo.dbProductRepo,     'DbProduct');
 const dbEngineSvc      = makeCatalogService(repo.dbEngineRepo,      'DbEngine');
+const networkProductSvc = makeCatalogService(repo.networkProductRepo, 'NetworkProduct');
 
 // =============================================================================
 // Proyectos
@@ -725,7 +727,7 @@ module.exports = {
   listRoles, createRole, updateRole, toggleRoleEstado, deleteRole,
   listTeams, createTeam, updateTeam, toggleTeamEstado, deleteTeam,
   listPermissions, getPermissionsByRole, setRolePermissions,
-  osSvc, serverProductSvc, dbProductSvc, dbEngineSvc,
+  osSvc, serverProductSvc, dbProductSvc, dbEngineSvc, networkProductSvc,
   listProjects, createProject, updateProject, toggleProjectEstado, deleteProject,
   ValidationError, NotFoundError, ConflictError, CustodyImpactError,
 };

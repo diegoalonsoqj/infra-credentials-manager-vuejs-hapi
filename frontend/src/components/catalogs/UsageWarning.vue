@@ -22,5 +22,5 @@ defineProps({
   usages: { type: Array, default: null },
 })
 
-const LABELS = { SERVER: 'Servidor', DB_SERVICE: 'Servicio de BD', APPLICATION: 'Aplicación', PROJECT: 'Proyecto' }
+const LABELS = { SERVER: 'Servidor', DB_SERVICE: 'Servicio de BD', APPLICATION: 'Aplicación', PROJECT: 'Proyecto', NETWORK_DEVICE: 'Dispositivo de red' }
 </script>

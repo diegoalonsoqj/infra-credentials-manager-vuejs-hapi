@@ -82,6 +82,12 @@
               Aplicaciones
             </CNavLink>
           </CNavItem>
+          <CNavItem v-if="canViewNET">
+            <CNavLink :active="isActive('/resources/network')" @click="router.push('/resources/network')" style="cursor: pointer">
+              <span class="nav-icon d-flex align-items-center justify-content-center"><Network :size="15" /></span>
+              Networking
+            </CNavLink>
+          </CNavItem>
         </CNavGroup>
 
         <!-- Modo narrow: items individuales -->
@@ -99,6 +105,11 @@
           <CNavItem v-if="canViewAPP">
             <CNavLink :active="isActive('/resources/applications')" @click="router.push('/resources/applications')" title="Aplicaciones" :style="narrowLinkStyle">
               <span class="d-flex align-items-center justify-content-center w-100"><Smartphone :size="17" /></span>
+            </CNavLink>
+          </CNavItem>
+          <CNavItem v-if="canViewNET">
+            <CNavLink :active="isActive('/resources/network')" @click="router.push('/resources/network')" title="Networking" :style="narrowLinkStyle">
+              <span class="d-flex align-items-center justify-content-center w-100"><Network :size="17" /></span>
             </CNavLink>
           </CNavItem>
         </template>
@@ -206,7 +217,7 @@ import { useRouter, useRoute } from 'vue-router'
 import {
   LayoutDashboard, KeyRound, Database, Monitor, Smartphone,
   LockKeyhole, ClipboardList, Users, Settings, RotateCcw,
-  Wrench, Server,
+  Wrench, Server, Network,
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../store/authStore.js'
 import { useSettingsStore } from '../../store/settingsStore.js'
@@ -233,8 +244,9 @@ const teamTypes        = computed(() => authStore.user?.teamResourceTypes || [])
 const canViewDB        = computed(() => isAdmin.value || teamTypes.value.includes('DB'))
 const canViewOS        = computed(() => isAdmin.value || teamTypes.value.includes('OS'))
 const canViewAPP       = computed(() => isAdmin.value || teamTypes.value.includes('APP'))
+const canViewNET       = computed(() => isAdmin.value || teamTypes.value.includes('NET'))
 const canViewResources = computed(() =>
-  authStore.hasPermission('RES_VIEW') && (canViewDB.value || canViewOS.value || canViewAPP.value)
+  authStore.hasPermission('RES_VIEW') && (canViewDB.value || canViewOS.value || canViewAPP.value || canViewNET.value)
 )
 const hasAdminSection  = computed(() =>
   authStore.hasPermission('MOD_USERS') || authStore.hasPermission('MOD_CATALOGS') ||

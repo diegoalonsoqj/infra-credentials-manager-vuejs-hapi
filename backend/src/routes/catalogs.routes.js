@@ -79,7 +79,7 @@ const descriptionField = Joi.string().max(500).allow('', null).optional()
   .messages(M('La descripción no puede superar 500 caracteres.'));
 
 const resourceTypesField = Joi.array()
-  .items(Joi.string().valid('DB', 'OS', 'APP').messages(M('Cada tipo de recurso debe ser DB, OS o APP.')))
+  .items(Joi.string().valid('DB', 'OS', 'APP', 'NET').messages(M('Cada tipo de recurso debe ser DB, OS, APP o NET.')))
   .min(1).required()
   .messages(M('Debe indicar al menos un tipo de recurso.'));
 
@@ -438,6 +438,7 @@ module.exports = {
       ...simpleCatalogRoutes('cat-server-products', svc.serverProductSvc),
       ...simpleCatalogRoutes('cat-db-products',     svc.dbProductSvc),
       ...simpleCatalogRoutes('cat-db-engines',      svc.dbEngineSvc),
+      ...simpleCatalogRoutes('cat-network-products', svc.networkProductSvc),
 
       // ---------------------------------------------------------------------
       // Proyectos — catálogo vinculado a infraestructura

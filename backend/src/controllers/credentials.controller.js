@@ -63,8 +63,8 @@ const listQuerySchema = Joi.object({
   search: searchQuery,
   environmentId: Joi.number().integer().min(1).allow('')
     .messages(M('environmentId debe ser un entero positivo.')),
-  resourceType: Joi.string().valid('DB', 'OS', 'APP').allow('')
-    .messages(M('resourceType debe ser DB, OS o APP.')),
+  resourceType: Joi.string().valid('DB', 'OS', 'APP', 'NET').allow('')
+    .messages(M('resourceType debe ser DB, OS, APP o NET.')),
   custodied: Joi.string().valid('true', 'false')
     .messages(M('custodied debe ser true o false.')),
   estado: Joi.string().valid('AI', 'IN').allow('')
@@ -116,8 +116,8 @@ async function decryptPassword(request, h) {
 const createSchema = Joi.object({
   instanceId: Joi.number().integer().min(1).required()
     .messages(M('La instancia es obligatoria.')),
-  resourceType: Joi.string().valid('DB', 'OS', 'APP').allow('', null).optional()
-    .messages(M('Tipo de recurso debe ser DB, OS o APP.')),
+  resourceType: Joi.string().valid('DB', 'OS', 'APP', 'NET').allow('', null).optional()
+    .messages(M('Tipo de recurso debe ser DB, OS, APP o NET.')),
   username: Joi.string().trim().max(200).required()
     .messages(M('El username es obligatorio.')),
   password: Joi.string().max(1000).required()

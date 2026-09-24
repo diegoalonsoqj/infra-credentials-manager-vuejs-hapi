@@ -100,11 +100,11 @@ async function auditAction({
 }
 
 // ---------------------------------------------------------------------------
-// Helper: nombre del recurso para auditoría (DB, OS y APP)
+// Helper: nombre del recurso para auditoría (DB, OS, APP y NET)
 // ---------------------------------------------------------------------------
 function resourceName(cred) {
-  // Alias de credentials.repository: server_code, db_code y app_code.
-  const codes = { OS: cred.server_code, DB: cred.db_code, APP: cred.app_code };
+  // Alias de credentials.repository: server_code, db_code, app_code y net_code.
+  const codes = { OS: cred.server_code, DB: cred.db_code, APP: cred.app_code, NET: cred.net_code };
   return `${codes[cred.resource_type] || '?'}/${cred.username}`;
 }
 
@@ -114,7 +114,7 @@ function resourceName(cred) {
 async function getCatalogs(actor) {
   const allowedTypes = getResourceTypesForUser(actor);
 
-  const [dbInstances, serverInstances, applications, users, environments] = await Promise.all([
+  const [dbInstances, serverInstances, applications, networkDevices, users, environments] = await Promise.all([
     (allowedTypes === null || allowedTypes.includes('DB'))
       ? repo.findAvailableDbServices()
       : Promise.resolve([]),
@@ -124,10 +124,13 @@ async function getCatalogs(actor) {
     (allowedTypes === null || allowedTypes.includes('APP'))
       ? repo.findAvailableApplications()
       : Promise.resolve([]),
+    (allowedTypes === null || allowedTypes.includes('NET'))
+      ? repo.findAvailableNetworkDevices()
+      : Promise.resolve([]),
     actor.level >= ROLE_LEVELS.ADMIN ? repo.findActiveUsers() : Promise.resolve([]),
     catalogsRepo.findAllEnvironments(),
   ]);
-  return { dbInstances, serverInstances, applications, users, environments };
+  return { dbInstances, serverInstances, applications, networkDevices, users, environments };
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +292,9 @@ async function decryptPassword(id, actor) {
 
   logger.info('Contraseña descifrada.', {
     credId:   cred.id,
-    resource: cred.database_code || cred.server_code,
+    // resourceName cubre los cuatro tipos. Antes se leía database_code, un alias
+    // que no existe (es db_code): el log salía sin recurso salvo en servidores.
+    resource: resourceName(cred),
     env:      cred.environment_code,
     by:       actor.username,
     prd:      cred.prd_flag,
@@ -316,11 +321,11 @@ async function createCredential(data, actor) {
   //   - ADMIN: debe enviarlo explícitamente (ve todos los tipos).
   //   - No-ADMIN con un solo tipo en su equipo: se infiere automáticamente.
   //   - No-ADMIN con múltiples tipos: debe enviarlo explícitamente (validado contra su scope).
-  const VALID_TYPES = ['DB', 'OS', 'APP'];
+  const VALID_TYPES = ['DB', 'OS', 'APP', 'NET'];
   let resourceType;
   if (actor.level >= ROLE_LEVELS.ADMIN) {
     if (!reqResourceType || !VALID_TYPES.includes(reqResourceType)) {
-      throw new ValidationError('El tipo de recurso (DB/OS/APP) es obligatorio para ADMIN.');
+      throw new ValidationError('El tipo de recurso (DB/OS/APP/NET) es obligatorio para ADMIN.');
     }
     resourceType = reqResourceType;
   } else {
@@ -339,7 +344,7 @@ async function createCredential(data, actor) {
     } else {
       // Equipo con múltiples tipos: el frontend debe enviar resourceType
       if (!reqResourceType || !VALID_TYPES.includes(reqResourceType)) {
-        throw new ValidationError('Tu equipo gestiona múltiples tipos de recurso. Indica el tipo (DB/OS/APP) al crear la credencial.');
+        throw new ValidationError('Tu equipo gestiona múltiples tipos de recurso. Indica el tipo (DB/OS/APP/NET) al crear la credencial.');
       }
       if (!allowedTypes.includes(reqResourceType)) {
         throw new ForbiddenError(`Tu equipo no tiene acceso a recursos de tipo ${reqResourceType}.`);
@@ -351,6 +356,7 @@ async function createCredential(data, actor) {
   const dbServiceId    = resourceType === 'DB'  ? parseInt(instanceId, 10) : null;
   const serverId       = resourceType === 'OS'  ? parseInt(instanceId, 10) : null;
   const applicationId  = resourceType === 'APP' ? parseInt(instanceId, 10) : null;
+  const networkDeviceId = resourceType === 'NET' ? parseInt(instanceId, 10) : null;
 
   // Verificar que la instancia existe y está activa
   let instance = null;
@@ -363,6 +369,9 @@ async function createCredential(data, actor) {
   } else if (resourceType === 'APP') {
     instance = await repo.findApplicationById(applicationId);
     if (!instance) throw new ValidationError('La aplicación indicada no existe o no está activa.');
+  } else if (resourceType === 'NET') {
+    instance = await repo.findNetworkDeviceById(networkDeviceId);
+    if (!instance) throw new ValidationError('El dispositivo de red indicado no existe o no está activo.');
   }
 
   // Custodia: cualquier usuario con CRED_EDIT puede auto-custodiarse.
@@ -402,6 +411,7 @@ async function createCredential(data, actor) {
     dbServiceId,
     serverId,
     applicationId,
+    networkDeviceId,
     resourceType,
     username,
     plainPassword: password,

@@ -96,13 +96,14 @@ async function custodiadasPorTipo(runner, userId) {
 function custodiadasPorGrupoSql(campo) {
   return `
     SELECT c.id, c.resource_type, c.username,
-           COALESCE(s.code, d.code, a.code) AS instance_code,
+           COALESCE(s.code, d.code, a.code, n.code) AS instance_code,
            u.username AS custodian, u.role_id, u.team_id
     FROM sch_secret.tbl_credentials c
     JOIN sch_system.tbl_users u ON u.id = c.custodian_user_id
     LEFT JOIN sch_system.tbl_servers      s ON s.id = c.server_id
     LEFT JOIN sch_system.tbl_db_services  d ON d.id = c.db_service_id
     LEFT JOIN sch_system.tbl_applications a ON a.id = c.application_id
+    LEFT JOIN sch_system.tbl_network_devices n ON n.id = c.network_device_id
     WHERE c.is_custodied = TRUE AND c.estado_registro = 'O'
       AND u.estado = 'AI' AND u.estado_registro = 'O'
       AND u.${campo} = $1

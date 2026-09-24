@@ -55,6 +55,7 @@ const MODULE_ROUTES = [
   ['/api/credentials',  require('./routes/credentials.routes')],
   ['/api/resources',    require('./routes/resources.routes')],
   ['/api/applications', require('./routes/applications.routes')],
+  ['/api/network-devices', require('./routes/networkDevices.routes')],
   ['/api/audit',        require('./routes/audit.routes')],
   ['/api/admin',        require('./routes/admin.routes')],
   ['/api/profile',      require('./routes/profile.routes')],

@@ -40,6 +40,11 @@ const routes = [
         meta: { permission: 'RES_VIEW', teamScope: 'APP' },
       },
       {
+        path: 'resources/network',
+        component: () => import('../pages/resources/NetworkDevicesPage.vue'),
+        meta: { permission: 'RES_VIEW', teamScope: 'NET' },
+      },
+      {
         path: 'tools/password-generator',
         component: () => import('../pages/tools/PasswordGeneratorPage.vue'),
         meta: { permission: 'MOD_PWDGEN' },

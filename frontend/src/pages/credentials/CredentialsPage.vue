@@ -27,6 +27,7 @@
                 <option value="DB">DB</option>
                 <option value="OS">OS</option>
                 <option value="APP">APP</option>
+                <option value="NET">NET</option>
               </CFormSelect>
               <CFormSelect size="sm" v-model="filterEstado"
                 @change="filterEstado = $event.target.value; page = 1"
@@ -76,7 +77,7 @@
                 <CTableDataCell class="fw-semibold">{{ cred.username }}</CTableDataCell>
                 <CTableDataCell>
                   <div class="d-flex align-items-center gap-1">
-                    <CBadge :color="cred.resource_type === 'OS' ? 'warning' : cred.resource_type === 'APP' ? 'success' : 'info'" class="small">
+                    <CBadge :color="TYPE_COLORS[cred.resource_type] || 'info'" class="small">
                       {{ cred.resource_type }}
                     </CBadge>
                     <span>{{ resourceLabel(cred) }}</span>
@@ -188,22 +189,19 @@
         <CModalBody>
           <CAlert v-if="formError" color="danger" class="py-2 small">{{ formError }}</CAlert>
           <CRow class="g-3">
-            <CCol v-if="isAdmin" :md="12">
+            <!-- ADMIN elige entre todos los tipos; un equipo con varios tipos, entre los suyos -->
+            <CCol v-if="mustPickType" :md="12">
               <CFormLabel class="small fw-semibold">Tipo de recurso *</CFormLabel>
               <CFormSelect size="sm" v-model="createForm.resourceType"
                 @change="createForm.resourceType = $event.target.value; createForm.instanceId = ''" required>
                 <option value="">— Selecciona tipo —</option>
-                <option value="DB">BD (Base de datos — equipo DBA)</option>
-                <option value="OS">OS (Servidor — equipo SYSADMIN)</option>
-                <option value="APP">APP (Aplicación)</option>
+                <option v-for="t in creatableTypes" :key="t" :value="t">{{ TYPE_OPTION_LABELS[t] }}</option>
               </CFormSelect>
             </CCol>
             <CCol :md="12">
-              <CFormLabel class="small fw-semibold">
-                {{ effectiveResourceType === 'OS' ? 'Servidor *' : effectiveResourceType === 'APP' ? 'Aplicación *' : 'Servicio de BD *' }}
-              </CFormLabel>
+              <CFormLabel class="small fw-semibold">{{ INSTANCE_LABELS[effectiveResourceType] || 'Servicio de BD *' }}</CFormLabel>
               <CFormSelect size="sm" v-model="createForm.instanceId" required
-                :disabled="isAdmin && !createForm.resourceType">
+                :disabled="mustPickType && !createForm.resourceType">
                 <option value="">— Selecciona instancia —</option>
                 <template v-if="effectiveResourceType === 'OS'">
                   <option v-for="inst in serverInstances" :key="inst.id" :value="String(inst.id)">
@@ -213,6 +211,11 @@
                 <template v-else-if="effectiveResourceType === 'APP'">
                   <option v-for="inst in applications" :key="inst.id" :value="String(inst.id)">
                     {{ applicationInstanceLabel(inst) }}
+                  </option>
+                </template>
+                <template v-else-if="effectiveResourceType === 'NET'">
+                  <option v-for="inst in networkDevices" :key="inst.id" :value="String(inst.id)">
+                    {{ networkInstanceLabel(inst) }}
                   </option>
                 </template>
                 <template v-else>
@@ -415,7 +418,7 @@
             </tr>
             <tr>
               <td class="text-medium-emphasis pe-3" style="vertical-align: top">Tipo</td>
-              <td><CBadge :color="detailCred.resource_type === 'OS' ? 'warning' : detailCred.resource_type === 'APP' ? 'success' : 'info'">{{ detailCred.resource_type }}</CBadge></td>
+              <td><CBadge :color="TYPE_COLORS[detailCred.resource_type] || 'info'">{{ detailCred.resource_type }}</CBadge></td>
             </tr>
             <tr>
               <td class="text-medium-emphasis pe-3" style="vertical-align: top">Recurso</td>
@@ -558,7 +561,12 @@ const environments    = ref([])
 const dbInstances     = ref([])
 const serverInstances = ref([])
 const applications    = ref([])
+const networkDevices  = ref([])
 const activeUsers     = ref([])
+
+// Color de la insignia y etiqueta del selector de recurso, por tipo.
+const TYPE_COLORS     = { DB: 'info', OS: 'warning', APP: 'success', NET: 'primary' }
+const INSTANCE_LABELS = { DB: 'Servicio de BD *', OS: 'Servidor *', APP: 'Aplicación *', NET: 'Dispositivo de red *' }
 
 // Modals
 const showCreate        = ref(false)
@@ -599,10 +607,23 @@ let countdownTimer = null
 // Detail
 const totalPages = computed(() => Math.ceil(total.value / limit.value) || 1)
 
-const effectiveResourceType = computed(() => {
-  const teamTypes = user.value?.teamResourceTypes || []
-  return isAdmin.value ? createForm.resourceType : (createForm.resourceType || teamTypes[0] || 'DB')
-})
+const TYPE_OPTION_LABELS = {
+  DB:  'BD (Base de datos — equipo DBA)',
+  OS:  'OS (Servidor — equipo SYSADMIN)',
+  APP: 'APP (Aplicación)',
+  NET: 'NET (Dispositivo de red — equipo NETOPS)',
+}
+// Tipos entre los que se puede crear: todos para ADMIN, los del equipo para el resto.
+const creatableTypes = computed(() =>
+  isAdmin.value ? Object.keys(TYPE_OPTION_LABELS) : (user.value?.teamResourceTypes || [])
+)
+// Hay que elegir tipo si hay más de uno posible. Antes solo se ofrecía al ADMIN:
+// un equipo con varios tipos (p. ej. NET y OS) veía recursos del primero y
+// enviaba el tipo vacío, que el backend rechaza.
+const mustPickType = computed(() => creatableTypes.value.length > 1)
+const effectiveResourceType = computed(() =>
+  mustPickType.value ? createForm.resourceType : (creatableTypes.value[0] || 'DB')
+)
 
 async function loadCredentials() {
   loading.value = true; listError.value = null
@@ -635,15 +656,21 @@ async function openCreate() {
     dbInstances.value     = data.dbInstances         || []
     serverInstances.value = data.serverInstances     || []
     applications.value    = data.applications        || []
+    networkDevices.value  = data.networkDevices      || []
     activeUsers.value     = data.users               || []
-  } catch { dbInstances.value = []; serverInstances.value = []; applications.value = []; activeUsers.value = [] }
+  } catch {
+    dbInstances.value = []; serverInstances.value = []; applications.value = []
+    networkDevices.value = []; activeUsers.value = []
+  }
   showCreate.value = true
 }
 
 async function handleCreate() {
   saving.value = true; formError.value = null
   try {
-    await api.post('/credentials', { ...createForm })
+    // Se envía el tipo que se está mostrando: con un solo tipo posible el
+    // formulario no lo pregunta y createForm.resourceType queda vacío.
+    await api.post('/credentials', { ...createForm, resourceType: effectiveResourceType.value })
     showCreate.value = false; page.value = 1; loadCredentials()
   } catch (err) { formError.value = err?.message || 'Error al crear la credencial.' }
   finally { saving.value = false }
@@ -755,16 +782,19 @@ function canOperateCustodied(cred) { return !cred.is_custodied || cred.custodian
 function resourceCode(cred) {
   if (cred.resource_type === 'OS')  return cred.server_code || '—'
   if (cred.resource_type === 'APP') return cred.app_code    || '—'
+  if (cred.resource_type === 'NET') return cred.net_code    || '—'
   return cred.db_code || '—'
 }
 function resourceLabel(cred) {
   if (cred.resource_type === 'OS')  return cred.server_name || cred.server_code || '—'
   if (cred.resource_type === 'APP') return cred.app_name    || cred.app_code    || '—'
+  if (cred.resource_type === 'NET') return cred.net_name    || cred.net_code    || '—'
   return cred.db_name || cred.db_code || '—'
 }
 function instanceDetail(cred) {
   if (cred.resource_type === 'OS') return cred.server_hostname || cred.server_ip || '—'
   if (cred.resource_type === 'APP') return cred.app_url || cred.app_name || '—'
+  if (cred.resource_type === 'NET') return cred.net_port ? `${cred.net_host}:${cred.net_port}` : (cred.net_host || '—')
   return `${cred.db_host || '—'}:${cred.db_port || '—'}`
 }
 function credRevealTip(cred) {
@@ -781,6 +811,9 @@ function serverInstanceLabel(inst) {
 }
 function applicationInstanceLabel(inst) {
   return `${inst.code} — ${inst.name} / ${inst.environment_code}${inst.prd_flag ? ' [PRD]' : ''}${inst.url ? ` — ${inst.url}` : ''}`
+}
+function networkInstanceLabel(inst) {
+  return `${inst.code} — ${inst.name} / ${inst.environment_code}${inst.prd_flag ? ' [PRD]' : ''} — ${inst.host}${inst.port ? `:${inst.port}` : ''}`
 }
 function formatDate(iso) {
   if (!iso) return '—'

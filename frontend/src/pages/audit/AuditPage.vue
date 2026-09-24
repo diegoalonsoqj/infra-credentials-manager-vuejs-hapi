@@ -23,6 +23,7 @@
                 <option value="DB">DB</option>
                 <option value="OS">OS</option>
                 <option value="APP">APP</option>
+                <option value="NET">NET</option>
                 <option value="SYS">SYS</option>
               </CFormSelect>
               <CFormSelect size="sm" v-model="filters.result" style="width: 105px">
@@ -154,6 +155,11 @@ const ACTION_LABELS = {
   RESOURCE_DB_CREATE: 'Crear base de datos', RESOURCE_DB_UPDATE: 'Editar base de datos',
   RESOURCE_DB_DELETE: 'Eliminar base de datos', RESOURCE_DB_INSTANCE_CREATE: 'Crear instancia BD',
   RESOURCE_DB_INSTANCE_UPDATE: 'Editar instancia BD', RESOURCE_DB_INSTANCE_DELETE: 'Eliminar instancia BD',
+  RESOURCE_APP_CREATE: 'Crear aplicación', RESOURCE_APP_UPDATE: 'Editar aplicación',
+  RESOURCE_APP_DELETE: 'Eliminar aplicación',
+  RESOURCE_NET_CREATE: 'Crear dispositivo de red', RESOURCE_NET_UPDATE: 'Editar dispositivo de red',
+  RESOURCE_NET_DELETE: 'Eliminar dispositivo de red',
+  LDAP_CONFIG_UPDATE: 'Cambiar conexión LDAP', LDAP_TEST: 'Probar conexión LDAP',
   SETUP_COMPLETED: 'Instalación completada', MASTER_KEY_ROTATION_START: 'Inicio rotación Master Key',
   MASTER_KEY_ROTATION_SUCCESS: 'Rotación Master Key exitosa', MASTER_KEY_ROTATION_FAIL: 'Rotación Master Key fallida',
 }

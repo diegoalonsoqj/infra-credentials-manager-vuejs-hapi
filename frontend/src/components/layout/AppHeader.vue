@@ -86,7 +86,7 @@ import { useRouter, useRoute } from 'vue-router'
 import {
   Menu, LogOut, UserCircle, LayoutDashboard, KeyRound, Database,
   Monitor, Smartphone, LockKeyhole, ClipboardList, Users, Settings,
-  Wrench, RotateCcw, Sun, Moon,
+  Wrench, RotateCcw, Sun, Moon, Network,
 } from 'lucide-vue-next'
 import api from '../../api/index.js'
 import { useAuthStore } from '../../store/authStore.js'
@@ -112,6 +112,7 @@ const PAGE_MAP = {
   '/resources/databases':      { title: 'Bases de Datos',            icon: Database },
   '/resources/servers':        { title: 'Servidores',                icon: Monitor },
   '/resources/applications':   { title: 'Aplicaciones',              icon: Smartphone },
+  '/resources/network':        { title: 'Networking',                icon: Network },
   '/tools/password-generator': { title: 'Generador de Contraseñas',  icon: LockKeyhole },
   '/audit':                    { title: 'Auditoría',                 icon: ClipboardList },
   '/admin/users':              { title: 'Usuarios',                  icon: Users },

@@ -29,9 +29,11 @@ async function getCredentialStats(resourceTypes = null) {
        COUNT(*) FILTER (WHERE c.resource_type = 'DB')               AS db_total,
        COUNT(*) FILTER (WHERE c.resource_type = 'OS')               AS os_total,
        COUNT(*) FILTER (WHERE c.resource_type = 'APP')              AS app_total,
+       COUNT(*) FILTER (WHERE c.resource_type = 'NET')              AS net_total,
        COUNT(*) FILTER (WHERE c.resource_type = 'DB' AND c.is_custodied) AS db_custodied,
        COUNT(*) FILTER (WHERE c.resource_type = 'OS' AND c.is_custodied) AS os_custodied,
-       COUNT(*) FILTER (WHERE c.resource_type = 'APP' AND c.is_custodied) AS app_custodied
+       COUNT(*) FILTER (WHERE c.resource_type = 'APP' AND c.is_custodied) AS app_custodied,
+       COUNT(*) FILTER (WHERE c.resource_type = 'NET' AND c.is_custodied) AS net_custodied
      FROM sch_secret.tbl_credentials c
      WHERE c.estado_registro = 'O' AND c.estado = 'AI'
      ${filter}`,
@@ -45,9 +47,11 @@ async function getCredentialStats(resourceTypes = null) {
     dbTotal:      parseInt(r.db_total, 10),
     osTotal:      parseInt(r.os_total, 10),
     appTotal:     parseInt(r.app_total, 10),
+    netTotal:     parseInt(r.net_total, 10),
     dbCustodied:  parseInt(r.db_custodied, 10),
     osCustodied:  parseInt(r.os_custodied, 10),
     appCustodied: parseInt(r.app_custodied, 10),
+    netCustodied: parseInt(r.net_custodied, 10),
   };
 }
 
@@ -95,9 +99,9 @@ async function getCredentialsByEnvironment(resourceTypes = null) {
 
   const { rows } = await query(
     `SELECT
-       COALESCE(es.name, ed.name, ea.name)         AS env_name,
-       COALESCE(es.code, ed.code, ea.code)         AS env_code,
-       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, false) AS prd_flag,
+       COALESCE(es.name, ed.name, ea.name, en.name) AS env_name,
+       COALESCE(es.code, ed.code, ea.code, en.code) AS env_code,
+       COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, en.prd_flag, false) AS prd_flag,
        COUNT(*)::int                                AS total
      FROM sch_secret.tbl_credentials c
      LEFT JOIN sch_system.tbl_servers       s   ON s.id  = c.server_id
@@ -106,10 +110,12 @@ async function getCredentialsByEnvironment(resourceTypes = null) {
      LEFT JOIN sch_system.tbl_environment   ed  ON ed.id = d.environment_id
      LEFT JOIN sch_system.tbl_applications  a   ON a.id  = c.application_id
      LEFT JOIN sch_system.tbl_environment   ea  ON ea.id = a.environment_id
+     LEFT JOIN sch_system.tbl_network_devices n ON n.id = c.network_device_id
+     LEFT JOIN sch_system.tbl_environment   en  ON en.id = n.environment_id
      WHERE c.estado_registro = 'O' AND c.estado = 'AI'
      ${filtro}
-     GROUP BY env_name, env_code, COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, false)
-     ORDER BY COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, false) DESC, total DESC
+     GROUP BY env_name, env_code, COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, en.prd_flag, false)
+     ORDER BY COALESCE(es.prd_flag, ed.prd_flag, ea.prd_flag, en.prd_flag, false) DESC, total DESC
      LIMIT 10`,
     params
   );

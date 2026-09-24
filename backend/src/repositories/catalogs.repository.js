@@ -61,6 +61,9 @@ async function findEnvironmentUsages(environmentId) {
      UNION ALL
      SELECT 'APPLICATION', code, name FROM sch_system.tbl_applications
       WHERE environment_id = $1 AND estado_registro = 'O'
+     UNION ALL
+     SELECT 'NETWORK_DEVICE', code, name FROM sch_system.tbl_network_devices
+      WHERE environment_id = $1 AND estado_registro = 'O'
      ORDER BY 1, 2`,
     [environmentId]
   );
@@ -156,6 +159,9 @@ async function findInfrastructureUsages(infrastructureId) {
       WHERE infrastructure_id = $1 AND estado_registro = 'O'
      UNION ALL
      SELECT 'DB_SERVICE', code, name FROM sch_system.tbl_db_services
+      WHERE infrastructure_id = $1 AND estado_registro = 'O'
+     UNION ALL
+     SELECT 'NETWORK_DEVICE', code, name FROM sch_system.tbl_network_devices
       WHERE infrastructure_id = $1 AND estado_registro = 'O'
      UNION ALL
      SELECT 'PROJECT', code, name FROM sch_system.tbl_cat_project
@@ -504,6 +510,7 @@ const CATALOG_TABLE_WHITELIST = new Set([
   'tbl_cat_server_product',
   'tbl_cat_db_product',
   'tbl_cat_db_engine',
+  'tbl_cat_network_product',
 ]);
 
 // Quién referencia a cada catálogo. Se usa para contar dependientes antes de
@@ -512,7 +519,7 @@ const CATALOG_TABLE_WHITELIST = new Set([
 //
 // Los nombres son constantes del módulo, nunca entrada del request, pero se
 // validan igual contra lista blanca antes de interpolarse en el SQL.
-const USAGE_TABLE_WHITELIST = new Set(['tbl_servers', 'tbl_db_services']);
+const USAGE_TABLE_WHITELIST = new Set(['tbl_servers', 'tbl_db_services', 'tbl_network_devices']);
 const USAGE_COLUMN_WHITELIST = new Set(['os_id', 'product_id', 'engine_id']);
 
 /**
@@ -627,6 +634,8 @@ const dbProductRepo     = makeCatalogRepo('tbl_cat_db_product',     'DBP',
   { table: 'tbl_db_services', column: 'product_id', label: 'servicio(s) de base de datos' });
 const dbEngineRepo      = makeCatalogRepo('tbl_cat_db_engine',      'DBE',
   { table: 'tbl_db_services', column: 'engine_id',  label: 'servicio(s) de base de datos' });
+const networkProductRepo = makeCatalogRepo('tbl_cat_network_product', 'NP',
+  { table: 'tbl_network_devices', column: 'product_id', label: 'dispositivo(s) de red' });
 
 // ---------------------------------------------------------------------------
 // tbl_cat_project — proyectos por infraestructura
@@ -756,7 +765,7 @@ module.exports = {
   findAllPermissions, findPermissionsByRoleId,
   assignPermissionToRole, revokePermissionFromRole, setRolePermissions,
   // Catálogos de recursos
-  osRepo, serverProductRepo, dbProductRepo, dbEngineRepo,
+  osRepo, serverProductRepo, dbProductRepo, dbEngineRepo, networkProductRepo,
   // Proyectos
   findAllProjects, findProjectById, existsProjectByCode, findProjectUsages,
   createProject, updateProject, toggleProjectEstado, softDeleteProject,

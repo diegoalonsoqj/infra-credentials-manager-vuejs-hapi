@@ -29,7 +29,7 @@
 
       <!-- KPI Row 2 -->
       <CRow class="g-3 mb-4">
-        <CCol :xs="6" :md="3" v-for="card in kpiRow2" :key="card.label">
+        <CCol :xs="6" :md="4" :xl="2" v-for="card in kpiRow2" :key="card.label">
           <CCard class="shadow-sm h-100" :style="{ borderTop: `3px solid var(--cui-${card.color})` }">
             <CCardBody class="p-3">
               <div class="d-flex align-items-start justify-content-between">
@@ -76,7 +76,7 @@
                       <td>{{ row.username }}</td>
                       <td>
                         <CBadge v-if="row.resource_type"
-                          :color="row.resource_type === 'DB' ? 'info' : row.resource_type === 'OS' ? 'warning' : 'success'"
+                          :color="TYPE_COLORS[row.resource_type] || 'secondary'"
                           class="me-1 small">{{ row.resource_type }}</CBadge>
                         <span class="text-truncate" style="max-width: 120px; display: inline-block; vertical-align: middle">
                           {{ row.resource_name || '—' }}
@@ -135,8 +135,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { KeyRound, LockKeyhole, Database, Monitor, Smartphone, ShieldCheck } from 'lucide-vue-next'
+import { KeyRound, LockKeyhole, Database, Monitor, Smartphone, ShieldCheck, Network } from 'lucide-vue-next'
 import api from '../../api/index.js'
+
+const TYPE_COLORS = { DB: 'info', OS: 'warning', APP: 'success', NET: 'primary', SYS: 'secondary' }
 
 const ACTION_LABELS = {
   CREATE_CREDENTIAL: 'Crear credencial',
@@ -175,6 +177,8 @@ const kpiRow1 = computed(() => [
 const kpiRow2 = computed(() => [
   { icon: Smartphone, label: 'Aplicaciones', value: loading.value ? null : stats.value.appTotal ?? '—',
     sub: loading.value ? null : (stats.value.appCustodied ?? 0) + ' custodiadas', color: 'success' },
+  { icon: Network, label: 'Networking', value: loading.value ? null : stats.value.netTotal ?? '—',
+    sub: loading.value ? null : (stats.value.netCustodied ?? 0) + ' custodiadas', color: 'primary' },
   { icon: LockKeyhole, label: 'Custodiadas DB', value: loading.value ? null : stats.value.dbCustodied ?? '—',
     sub: loading.value ? null : (stats.value.dbTotal ? Math.round((stats.value.dbCustodied / stats.value.dbTotal) * 100) + '% de BD' : null),
     color: 'info' },
@@ -184,6 +188,9 @@ const kpiRow2 = computed(() => [
   { icon: LockKeyhole, label: 'Custodiadas APP', value: loading.value ? null : stats.value.appCustodied ?? '—',
     sub: loading.value ? null : (stats.value.appTotal ? Math.round((stats.value.appCustodied / stats.value.appTotal) * 100) + '% de APP' : null),
     color: 'success' },
+  { icon: LockKeyhole, label: 'Custodiadas NET', value: loading.value ? null : stats.value.netCustodied ?? '—',
+    sub: loading.value ? null : (stats.value.netTotal ? Math.round((stats.value.netCustodied / stats.value.netTotal) * 100) + '% de NET' : null),
+    color: 'primary' },
 ])
 
 function formatDate(iso) {

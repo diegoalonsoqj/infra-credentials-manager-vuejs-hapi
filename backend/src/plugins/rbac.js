@@ -78,12 +78,12 @@ function requireMinLevel(minLevel) {
  * Pre-handler: verifica que el usuario pueda acceder al tipo de recurso indicado.
  *
  * Reglas de separación de responsabilidades:
- *   - Nivel ADMIN (level >= 100): bypass total — accede a DB, OS y APP sin restricción.
+ *   - Nivel ADMIN (level >= 100): bypass total — accede a DB, OS, APP y NET sin restricción.
  *   - Nivel VISITOR (level <= 0): sin acceso a ningún recurso.
  *   - Resto: el equipo del usuario debe incluir el resource_type requerido en su lista.
  *     Un equipo puede tener múltiples tipos (junction table tbl_team_resource_types).
  *
- * @param {'DB'|'OS'|'APP'} resourceType - Tipo de recurso del endpoint.
+ * @param {'DB'|'OS'|'APP'|'NET'} resourceType - Tipo de recurso del endpoint.
  * @returns {function} Pre-handler de hapi.
  */
 function requireTeamScope(resourceType) {

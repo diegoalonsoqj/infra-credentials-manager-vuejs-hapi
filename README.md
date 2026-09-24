@@ -103,7 +103,7 @@ infra-credentials-manager-vuejs/
 │   ├── dist/                # build de producción (generado)
 │   └── vite.config.js
 ├── database/
-│   ├── migrations/          # 001..017_*.sql (se aplican con npm run migrate)
+│   ├── migrations/          # 001..019_*.sql (se aplican con npm run migrate)
 │   └── seeds/               # 001_base_data.sql (roles, equipos, catálogos)
 ├── deploy/
 │   ├── nginx-icm.conf       # proxy inverso de ejemplo
@@ -446,6 +446,9 @@ Es idempotente y está pensado para cron.
 - Usuarios con **equipo asignado**:
   - **DBA**: acceso a credenciales de bases de datos.
   - **SYSADMIN**: acceso a credenciales de servidores.
+  - **APPOPS**: acceso a credenciales de aplicaciones.
+  - **NETOPS**: acceso a credenciales de dispositivos de red (routers, switches,
+    firewalls…), en el menú *Recursos → Networking*.
 
 El control de acceso es multinivel: nivel de rol + permisos + alcance por equipo.
 
@@ -462,6 +465,7 @@ Todos bajo `/api` (rate limiting global; límite estricto en `/api/auth`):
 | `/api/credentials` | CRUD y descifrado de credenciales |
 | `/api/resources` | Servidores y servicios de BD |
 | `/api/applications` | Aplicaciones |
+| `/api/network-devices` | Dispositivos de red |
 | `/api/catalogs` | Catálogos base |
 | `/api/dashboard` | Métricas y resumen |
 | `/api/audit` | Registro de auditoría |

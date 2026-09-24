@@ -52,8 +52,8 @@ const auditLogQuery = myActivityQuery.keys({
     'string.max':  'username no puede superar 100 caracteres.',
     '*':           'username no es válido.',
   }),
-  resourceType: Joi.string().valid('DB', 'OS', 'APP', 'SYS').allow('')
-    .messages(M('resourceType debe ser DB, OS, APP o SYS.')),
+  resourceType: Joi.string().valid('DB', 'OS', 'APP', 'NET', 'SYS').allow('')
+    .messages(M('resourceType debe ser DB, OS, APP, NET o SYS.')),
   isPrdAccess: Joi.string().valid('true', 'false').allow('')
     .messages(M('isPrdAccess debe ser true o false.')),
 });
