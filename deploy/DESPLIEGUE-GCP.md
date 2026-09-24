@@ -17,6 +17,11 @@ Archivos de este directorio que intervienen:
 | [`RECUPERACION.md`](./RECUPERACION.md) | Copias de seguridad y restauración |
 | [`nginx-icm.conf`](./nginx-icm.conf) | Solo para cuando se pase a HTTPS (ver el final) |
 
+> **Rutas, puerto e IPs de ejemplo.** La guía instala en `/opt/icm`, usa el
+> puerto `8743` y las IPs de documentación `203.0.113.x`. Si tu instalación usa
+> otra ruta (p. ej. `/APPS/infra-credentials-manager-vuejs-hapi`) u otro puerto
+> (`APP_PORT` en `backend/.env`), sustitúyelos en todos los comandos.
+
 ---
 
 ## ⚠️ Antes de empezar: esto es HTTP sin cifrar
@@ -72,7 +77,9 @@ gcloud compute firewall-rules create icm-allow-app \
   --source-ranges=203.0.113.10/32
 ```
 
-> **No abras 5432.** PostgreSQL solo escucha en la propia VM.
+> **No abras 5432 hacia fuera.** Con la base en la propia VM, PostgreSQL solo
+> escucha en local. Si está en otro servidor, ver
+> [La base de datos en otro servidor](#la-base-de-datos-en-otro-servidor).
 
 Ubuntu 24.04 trae PostgreSQL 16 en sus repositorios, que es la versión verificada
 (ver el README). Usa la misma versión mayor en la máquina que haga las copias.
@@ -107,6 +114,41 @@ SQL
 
 Genera la contraseña para este entorno (`openssl rand -base64 32`); no reutilices
 la de desarrollo. El wizard la pedirá en el paso 6.
+
+### La base de datos en otro servidor
+
+Si PostgreSQL no está en la VM de la aplicación, en el paso 2 instala solo el
+cliente (`sudo apt-get install -y postgresql-client-16`, para `psql` y las copias
+de seguridad) y prepara el servidor de la base:
+
+1. **Crear la base y el usuario** con el SQL de arriba, en ese servidor.
+2. **Permitir conexiones de un número razonable.** Si el rol se creó con
+   `CONNECTION LIMIT 0` (o por plantilla del DBA), no podrá conectarse nunca y
+   el wizard dará el error `53300`. La aplicación usa hasta `DB_POOL_MAX=10`
+   conexiones, más una o dos de `migrate` y `backup`:
+   ```sql
+   SELECT rolname, rolconnlimit FROM pg_roles WHERE rolname = 'icm_user';
+   ALTER ROLE icm_user CONNECTION LIMIT 20;
+   ```
+3. **Escuchar en la red**: en `postgresql.conf`, `listen_addresses` debe incluir
+   la IP privada del servidor (no solo `localhost`). Requiere reiniciar PostgreSQL.
+4. **Autorizar la IP de la VM** en `pg_hba.conf`:
+   ```
+   host  icm_db  icm_user  10.0.0.5/32  scram-sha-256
+   ```
+   y recargar: `SELECT pg_reload_conf();`
+5. **Firewall**: abre `tcp:5432` hacia el servidor de la base **solo desde la IP
+   privada de la VM** de la aplicación.
+
+Comprobación desde la VM de la aplicación:
+
+```bash
+psql "host=IP_DE_LA_BASE port=5432 dbname=icm_db user=icm_user" -c 'select 1'
+```
+
+En el wizard (paso 6), el host es la IP del servidor de la base. Si falla, el
+wizard muestra el motivo, y el log del backend una línea
+`testConnection failed {"code":"..."}` con el código de PostgreSQL.
 
 ---
 
@@ -191,25 +233,48 @@ crea `backend/.installed`. Detén el proceso con Ctrl+C.
 
 ## 7. Arrancar con PM2
 
+**Antes:** asegúrate de que no queda el `node src/app.js` del paso 6 en marcha
+(Ctrl+C en su terminal). Si sigue ahí, el puerto está ocupado y PM2 entrará en
+bucle de reinicios con `EADDRINUSE` en los logs.
+
 ```bash
 cd /opt/icm
 pm2 start deploy/ecosystem.config.cjs
+pm2 status                                   # "icm" debe aparecer "online"
+pm2 logs icm --lines 50                      # Ctrl+C para salir
+curl -s http://127.0.0.1:8743/api/health     # "installed": true
+```
+
+El ecosystem arranca el proceso dentro de `backend/`, así que toma el
+`backend/.env` (puerto incluido) sin más.
+
+### Arranque automático con el sistema
+
+```bash
+# Guarda la lista de procesos que PM2 restaurará al arrancar.
 pm2 save
 
-# Arranque automático al reiniciar la VM: imprime un comando con sudo,
-# cópialo y ejecútalo tal cual.
+# Crea y activa un servicio systemd (pm2-<usuario>). Si imprime un comando que
+# empieza por "sudo env PATH=...", cópialo y ejecútalo tal cual.
 pm2 startup systemd
+
+systemctl is-enabled pm2-$USER               # debe decir "enabled"
 
 # Rotación de los logs de PM2 (los de la app ya rotan con Winston)
 pm2 install pm2-logrotate
 ```
 
-Comprobaciones:
+> **`pm2 save` después de cualquier cambio en la lista de procesos** (añadir,
+> borrar o renombrar). El arranque automático restaura la última lista
+> guardada, no la que esté en marcha.
+
+Comprueba que de verdad arranca solo reiniciando la VM cuando sea posible:
 
 ```bash
+sudo reboot
+# al volver a entrar:
 pm2 status
-pm2 logs icm --lines 50
-curl -s http://127.0.0.1:8743/api/health     # "installed": true
+curl -s http://127.0.0.1:8743/api/health
 ```
 
 Y desde una de las IPs autorizadas, abre `http://203.0.113.50:8743`.
@@ -228,6 +293,10 @@ pm2 reload icm
 
 Las migraciones nuevas no se aplican solas al arrancar: por eso `npm run migrate`
 va antes del `reload`.
+
+Si el cambio es solo del frontend, basta con `npm run build`: el backend sirve
+`frontend/dist` desde disco y no hace falta reiniciarlo (recarga el navegador con
+Ctrl+F5).
 
 ---
 
