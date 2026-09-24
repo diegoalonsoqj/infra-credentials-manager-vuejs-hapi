@@ -25,6 +25,9 @@ function buildActor(request) {
     team:              user.team,
     level:             user.level,
     teamResourceTypes: user.teamResourceTypes || [],
+    // Nivel de acceso por tipo (services/teamAccess.js).
+    teamId:            user.teamId ?? null,
+    readOnlyTypes:     user.teamReadOnlyTypes || [],
   };
 }
 
@@ -103,11 +106,25 @@ async function getCredential(request, h) {
 // ---------------------------------------------------------------------------
 // POST /api/credentials/:id/decrypt
 // ---------------------------------------------------------------------------
+// Motivo del descifrado: obligatorio cuando el equipo solo tiene consulta sobre
+// el tipo y la credencial es de otro equipo (lo decide el servicio). El cuerpo
+// es opcional: el resto de descifrados siguen llegando sin él.
+const decryptSchema = Joi.object({
+  reason: Joi.string().trim().max(500).allow('').optional()
+    .messages(M('El motivo no puede superar 500 caracteres.')),
+}).allow(null);
+
 async function decryptPassword(request, h) {
   try {
-    const result = await svc.decryptPassword(request.params.id, buildActor(request));
+    const reason = request.payload?.reason || '';
+    const result = await svc.decryptPassword(request.params.id, buildActor(request), { reason });
     return { success: true, ...result };
-  } catch (err) { return handleServiceError(err, h); }
+  } catch (err) {
+    if (err.isReasonRequired) {
+      return h.response({ success: false, code: 'REASON_REQUIRED', message: err.message }).code(400);
+    }
+    return handleServiceError(err, h);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +226,7 @@ module.exports = {
   getCatalogs,
   listCredentials, listQuerySchema,
   getCredential,
-  decryptPassword,
+  decryptPassword, decryptSchema,
   createCredential, createSchema,
   updateCredential, updateSchema,
   toggleEstado,

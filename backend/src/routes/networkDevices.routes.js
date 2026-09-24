@@ -7,6 +7,7 @@ const {
   paginationQuery, queryId,
 } = require('../validation');
 const { clientIp } = require('../utils/clientIp');
+const { actorAccess } = require('../services/teamAccess');
 
 // =============================================================================
 // networkDevices.routes.js — Dispositivos de red (ámbito de equipo NET).
@@ -19,7 +20,7 @@ const canDelete = [requirePermission('RES_DELETE'), requireTeamScope('NET')];
 
 function actor(request) {
   const user = request.auth.credentials;
-  return { id: user.id, username: user.username, ip: clientIp(request) };
+  return { id: user.id, username: user.username, ip: clientIp(request), ...actorAccess(user) };
 }
 
 function handleError(h, err) {
@@ -28,6 +29,9 @@ function handleError(h, err) {
   }
   if (err.isNotFound) {
     return h.response({ success: false, code: 'NOT_FOUND', message: err.message }).code(404);
+  }
+  if (err.isForbidden) {
+    return h.response({ success: false, code: 'FORBIDDEN', message: err.message }).code(403);
   }
   // 23503: el ambiente, la infraestructura o el producto enviado no existe. Es
   // entrada del cliente, no un fallo del servidor.

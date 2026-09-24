@@ -83,6 +83,13 @@ const resourceTypesField = Joi.array()
   .min(1).required()
   .messages(M('Debe indicar al menos un tipo de recurso.'));
 
+// Tipos (de los anteriores) con acceso de consulta: ver todo, modificar solo lo
+// del equipo (migración 022). Opcional: sin él, todos quedan con acceso completo.
+const readOnlyTypesField = Joi.array()
+  .items(Joi.string().valid('DB', 'OS', 'APP', 'NET').messages(M('Cada tipo de consulta debe ser DB, OS, APP o NET.')))
+  .optional()
+  .messages(M('readOnlyTypes debe ser una lista de tipos de recurso.'));
+
 // Campo que el formulario de edición reenvía pero que no se puede cambiar: el
 // código de un registro, el nivel de un rol. Se declara para que el esquema
 // estricto no rechace el formulario entero, y se descarta antes de llegar al
@@ -129,6 +136,7 @@ const teamSchema = Joi.object({
   code: codeField,
   name: nameField(100),
   resourceTypes: resourceTypesField,
+  readOnlyTypes: readOnlyTypesField,
   description: descriptionField,
 });
 
@@ -141,6 +149,7 @@ const teamUpdateSchema = Joi.object({
   code: immutableField,
   name: nameField(100),
   resourceTypes: resourceTypesField,
+  readOnlyTypes: readOnlyTypesField,
   description: descriptionField,
   confirmCustodyImpact: confirmCustodyImpactField,
 });

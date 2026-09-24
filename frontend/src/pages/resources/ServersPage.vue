@@ -103,7 +103,8 @@
                     <CBadge :color="ESTADO_COLOR[srv.estado]">{{ ESTADO_LABEL[srv.estado] }}</CBadge>
                   </CTableDataCell>
                   <CTableDataCell class="text-end">
-                    <div v-if="canWrite" class="d-flex gap-1 justify-content-end">
+                    <!-- Con acceso de consulta a OS, solo se modifica lo del propio equipo -->
+                    <div v-if="canWrite && authStore.canModifyOwned('OS', srv.owner_team_id)" class="d-flex gap-1 justify-content-end">
                       <CButton size="sm" color="secondary" variant="outline" title="Editar"
                         @click="openModal('edit', srv)">
                         <Pencil :size="13" />

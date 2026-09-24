@@ -189,7 +189,10 @@
                 <CTableDataCell>
                   <div class="d-flex gap-1 flex-wrap">
                     <CBadge v-for="rt in (t.resource_types || [])" :key="rt"
-                      :color="TEAM_RT_COLORS[rt] || 'secondary'">{{ rt }}</CBadge>
+                      :color="TEAM_RT_COLORS[rt] || 'secondary'"
+                      :title="(t.read_only_types || []).includes(rt) ? 'Consulta: ve todo, modifica solo lo de su equipo' : 'Acceso completo'">
+                      {{ rt }}<template v-if="(t.read_only_types || []).includes(rt)"> · consulta</template>
+                    </CBadge>
                   </div>
                 </CTableDataCell>
                 <CTableDataCell>
@@ -523,6 +526,18 @@
                   :model-value="(teamForm.resourceTypes || []).includes(rt)"
                   @change="toggleTeamResourceType(teamForm, rt, $event.target.checked)" />
               </div>
+              <div v-if="(teamForm.resourceTypes || []).length" class="mt-2">
+                <div class="small text-medium-emphasis mb-1">Acceso por tipo</div>
+                <div v-for="rt in teamForm.resourceTypes" :key="`create-lvl-${rt}`" class="d-flex align-items-center gap-2 mb-1">
+                  <CBadge :color="TEAM_RT_COLORS[rt] || 'secondary'" style="min-width: 42px">{{ rt }}</CBadge>
+                  <CFormSelect size="sm" style="width: auto"
+                    :model-value="(teamForm.readOnlyTypes || []).includes(rt) ? 'READ' : 'FULL'"
+                    @change="setTeamAccess(teamForm, rt, $event.target.value)">
+                    <option value="FULL">Completo — ver y modificar todo</option>
+                    <option value="READ">Consulta — ver todo, modificar solo lo del equipo</option>
+                  </CFormSelect>
+                </div>
+              </div>
             </CCol>
             <CCol :md="12"><CFormLabel class="small fw-semibold">Nombre *</CFormLabel>
               <CFormInput size="sm" placeholder="ej: DBA Cloud" v-model="teamForm.name" required /></CCol>
@@ -553,6 +568,18 @@
                   :label="`${rt} — ${label}`"
                   :model-value="(teamForm.resourceTypes || []).includes(rt)"
                   @change="toggleTeamResourceType(teamForm, rt, $event.target.checked)" />
+              </div>
+              <div v-if="(teamForm.resourceTypes || []).length" class="mt-2">
+                <div class="small text-medium-emphasis mb-1">Acceso por tipo</div>
+                <div v-for="rt in teamForm.resourceTypes" :key="`edit-lvl-${rt}`" class="d-flex align-items-center gap-2 mb-1">
+                  <CBadge :color="TEAM_RT_COLORS[rt] || 'secondary'" style="min-width: 42px">{{ rt }}</CBadge>
+                  <CFormSelect size="sm" style="width: auto"
+                    :model-value="(teamForm.readOnlyTypes || []).includes(rt) ? 'READ' : 'FULL'"
+                    @change="setTeamAccess(teamForm, rt, $event.target.value)">
+                    <option value="FULL">Completo — ver y modificar todo</option>
+                    <option value="READ">Consulta — ver todo, modificar solo lo del equipo</option>
+                  </CFormSelect>
+                </div>
               </div>
             </CCol>
             <CCol :md="12"><CFormLabel class="small fw-semibold">Nombre *</CFormLabel>
@@ -744,7 +771,7 @@ const TEAM_RT_COLORS = { DB: 'info', OS: 'warning', APP: 'success', NET: 'primar
 const EMPTY_ENV   = { code: '', name: '', description: '', prdFlag: false, sortOrder: 0 }
 const EMPTY_INFRA = { code: '', name: '', description: '' }
 const EMPTY_ROLE  = { code: '', name: '', level: 50, description: '' }
-const EMPTY_TEAM  = { code: '', name: '', resourceTypes: ['DB'], description: '' }
+const EMPTY_TEAM  = { code: '', name: '', resourceTypes: ['DB'], readOnlyTypes: [], description: '' }
 const EMPTY_PROJ  = { name: '', infrastructureId: '', sortOrder: 0 }
 
 // ---------------------------------------------------------------------------
@@ -793,7 +820,7 @@ async function loadUsages(url) {
 const envForm   = reactive({ ...EMPTY_ENV })
 const infraForm = reactive({ ...EMPTY_INFRA })
 const roleForm  = reactive({ ...EMPTY_ROLE })
-const teamForm  = reactive({ code: '', name: '', resourceTypes: ['DB'], description: '' })
+const teamForm  = reactive({ code: '', name: '', resourceTypes: ['DB'], readOnlyTypes: [], description: '' })
 const projForm  = reactive({ ...EMPTY_PROJ })
 const formError = ref(null)
 const saving    = ref(false)
@@ -850,6 +877,14 @@ function toggleTeamResourceType(form, rt, checked) {
   teamImpact.value = null
   const current = form.resourceTypes || []
   form.resourceTypes = checked ? [...current, rt] : current.filter(x => x !== rt)
+  // Un tipo que se quita deja de poder ser de consulta.
+  if (!checked) form.readOnlyTypes = (form.readOnlyTypes || []).filter(x => x !== rt)
+}
+
+// Nivel de acceso de un tipo del equipo: FULL (completo) o READ (consulta).
+function setTeamAccess(form, rt, level) {
+  const current = (form.readOnlyTypes || []).filter(x => x !== rt)
+  form.readOnlyTypes = level === 'READ' ? [...current, rt] : current
 }
 
 // ---------------------------------------------------------------------------
@@ -965,7 +1000,12 @@ async function handleTeamCreate() {
 }
 function openTeamEdit(team) {
   selected.value = team
-  Object.assign(teamForm, { code: team.code, name: team.name, resourceTypes: [...(team.resource_types || [])], description: team.description || '' })
+  Object.assign(teamForm, {
+    code: team.code, name: team.name,
+    resourceTypes: [...(team.resource_types || [])],
+    readOnlyTypes: [...(team.read_only_types || [])],
+    description: team.description || '',
+  })
   formError.value = null; teamImpact.value = null; showTeamEdit.value = true
 }
 async function handleTeamEdit() {

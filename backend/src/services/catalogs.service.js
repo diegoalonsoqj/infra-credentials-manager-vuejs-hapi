@@ -382,25 +382,37 @@ function validateResourceTypes(resourceTypes) {
   return [...new Set(resourceTypes)];
 }
 
+/** Tipos de consulta: tienen que estar entre los tipos del equipo. */
+function validateReadOnlyTypes(readOnlyTypes, cleanTypes) {
+  const clean = [...new Set(readOnlyTypes || [])];
+  const fuera = clean.filter((t) => !cleanTypes.includes(t));
+  if (fuera.length > 0) {
+    throw new ValidationError(`Tipo(s) de consulta que el equipo no tiene: ${fuera.join(', ')}.`);
+  }
+  return clean;
+}
+
 async function createTeam(data, actor) {
-  const { code, name, resourceTypes, description } = data;
+  const { code, name, resourceTypes, readOnlyTypes, description } = data;
   if (!code || !code.trim()) throw new ValidationError('El código es obligatorio.');
   if (!/^[A-Za-z0-9_-]+$/.test(code)) throw new ValidationError('Código: solo letras, números, guion y guion bajo.');
   if (!name || !name.trim()) throw new ValidationError('El nombre es obligatorio.');
 
   const cleanTypes = validateResourceTypes(resourceTypes);
+  const cleanReadOnly = validateReadOnlyTypes(readOnlyTypes, cleanTypes);
 
   if (await repo.existsTeamByCode(code)) {
     throw new ConflictError(`Ya existe un equipo con el código "${code.toUpperCase()}".`);
   }
 
-  const team = await repo.createTeam({ code, name, resourceTypes: cleanTypes, description });
+  const team = await repo.createTeam({ code, name, resourceTypes: cleanTypes, readOnlyTypes: cleanReadOnly, description });
 
   await auditAction({
     actorId: actor.id, actorUsername: actor.username,
     action: AUDIT_ACTIONS.CATALOG_UPDATE,
     resourceId: team.id, resourceName: `TEAM:${team.code}`,
     result: RESULT.SUCCESS, ipAddress: actor.ip,
+    extra: { resourceTypes: cleanTypes, readOnlyTypes: cleanReadOnly },
   });
 
   logger.info('Equipo creado.', { code: team.code, resourceTypes: cleanTypes, by: actor.username });
@@ -408,13 +420,14 @@ async function createTeam(data, actor) {
 }
 
 async function updateTeam(id, data, actor) {
-  const { name, description, resourceTypes, confirmCustodyImpact } = data;
+  const { name, description, resourceTypes, readOnlyTypes, confirmCustodyImpact } = data;
   if (!name || !name.trim()) throw new ValidationError('El nombre es obligatorio.');
 
   const existing = await repo.findTeamById(id);
   if (!existing) throw new NotFoundError('Equipo no encontrado.');
 
   const cleanTypes = validateResourceTypes(resourceTypes);
+  const cleanReadOnly = validateReadOnlyTypes(readOnlyTypes, cleanTypes);
 
   // Quitar un tipo al equipo puede dejar sin descifrar las credenciales que
   // custodian sus miembros. Solo se calcula si de verdad se quita alguno.
@@ -424,14 +437,18 @@ async function updateTeam(id, data, actor) {
   );
   requireCustodyConfirmation(impact, confirmCustodyImpact);
 
-  const updated = await repo.updateTeam(id, { name, description, resourceTypes: cleanTypes });
+  const updated = await repo.updateTeam(id, { name, description, resourceTypes: cleanTypes, readOnlyTypes: cleanReadOnly });
 
   await auditAction({
     actorId: actor.id, actorUsername: actor.username,
     action: AUDIT_ACTIONS.CATALOG_UPDATE,
     resourceId: id, resourceName: `TEAM:${existing.code}`,
     result: RESULT.SUCCESS, ipAddress: actor.ip,
-    extra: custodyImpactExtra(impact),
+    extra: {
+      ...custodyImpactExtra(impact),
+      resourceTypes: cleanTypes, readOnlyTypes: cleanReadOnly,
+      readOnlyTypesAntes: existing.read_only_types || [],
+    },
   });
 
   logger.info('Equipo actualizado.', { id, resourceTypes: cleanTypes, by: actor.username });

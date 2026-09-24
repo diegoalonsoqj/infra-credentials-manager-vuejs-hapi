@@ -10,7 +10,7 @@ const { likePattern } = require('../utils/sqlLike');
 // =============================================================================
 
 const SELECT_COLUMNS = `
-       n.id, n.code, n.name, n.host, n.port, n.description,
+       n.id, n.code, n.name, n.host, n.port, n.description, n.owner_team_id,
        n.estado, n.estado_registro, n.created_at, n.updated_at,
        n.environment_id, n.infrastructure_id, n.product_id,
        e.code   AS environment_code,    e.name   AS environment_name, e.prd_flag,
@@ -73,11 +73,11 @@ async function countCredentials(deviceId) {
   return parseInt(rows[0].total, 10);
 }
 
-async function create({ name, host, port, infrastructureId, environmentId, productId, description, createdBy }) {
+async function create({ name, host, port, infrastructureId, environmentId, productId, description, createdBy, ownerTeamId }) {
   const { rows: [ins] } = await query(
     `INSERT INTO sch_system.tbl_network_devices
-       (code, name, host, port, infrastructure_id, environment_id, product_id, description, created_by)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8)
+       (code, name, host, port, infrastructure_id, environment_id, product_id, description, created_by, owner_team_id)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id, environment_id`,
     [
       name.trim(), host.trim(),
@@ -87,6 +87,7 @@ async function create({ name, host, port, infrastructureId, environmentId, produ
       productId        || null,
       description      || null,
       createdBy,
+      ownerTeamId      || null,
     ]
   );
   // Código definitivo NET-{AMBIENTE}-{NNNN}, como SRV- y APP-.

@@ -84,7 +84,8 @@
                     </CBadge>
                   </CTableDataCell>
                   <CTableDataCell class="text-end">
-                    <div class="d-flex gap-1 justify-content-end">
+                    <!-- Con acceso de consulta a APP, solo se modifica lo del propio equipo -->
+                    <div v-if="authStore.canModifyOwned('APP', app.owner_team_id)" class="d-flex gap-1 justify-content-end">
                       <template v-if="canWrite">
                         <CButton color="secondary" size="sm" variant="outline" title="Editar" @click="openEdit(app)">
                           <Pencil :size="13" />

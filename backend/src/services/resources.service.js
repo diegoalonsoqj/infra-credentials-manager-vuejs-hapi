@@ -4,6 +4,8 @@ const repo      = require('../repositories/resources.repository');
 const { query } = require('../config/database');
 const { AUDIT_ACTIONS, RESULT } = require('../config/constants');
 const logger    = require('../utils/logger');
+// Acceso de consulta por tipo: solo se modifica lo del propio equipo (migración 022).
+const teamAccess = require('./teamAccess');
 
 // =============================================================================
 // resources.service.js — Lógica de negocio para servidores y servicios de BD.
@@ -81,7 +83,7 @@ async function createServer(data, actor) {
   if (!data.environmentId)
     throw new ValidationError('El ambiente es obligatorio');
 
-  const server = await repo.createServer({ ...data, createdBy: actor.id });
+  const server = await repo.createServer({ ...data, createdBy: actor.id, ownerTeamId: teamAccess.ownerTeamFor(actor) });
 
   await audit({
     actorId: actor.id, actorUsername: actor.username,
@@ -96,6 +98,7 @@ async function createServer(data, actor) {
 async function updateServer(id, data, actor) {
   const existing = await repo.findServerById(id);
   if (!existing) throw new NotFoundError('Servidor no encontrado');
+  teamAccess.assertCanModify(actor, 'OS', existing.owner_team_id);
 
   if (!data.hostname || data.hostname.trim().length < 2)
     throw new ValidationError('El hostname es obligatorio');
@@ -120,6 +123,7 @@ async function updateServer(id, data, actor) {
 async function toggleServerEstado(id, actor) {
   const existing = await repo.findServerById(id);
   if (!existing) throw new NotFoundError('Servidor no encontrado');
+  teamAccess.assertCanModify(actor, 'OS', existing.owner_team_id);
 
   // Solo se comprueba al DESACTIVAR: el toggle es bidireccional y reactivar debe
   // seguir siendo posible siempre.
@@ -157,6 +161,7 @@ async function toggleServerEstado(id, actor) {
 async function deleteServer(id, actor) {
   const existing = await repo.findServerById(id);
   if (!existing) throw new NotFoundError('Servidor no encontrado');
+  teamAccess.assertCanModify(actor, 'OS', existing.owner_team_id);
 
   const creds = await repo.countCredentialsByServer(id);
   if (creds > 0)
@@ -198,7 +203,7 @@ async function createDbService(data, actor) {
   if (!data.environmentId)
     throw new ValidationError('El ambiente es obligatorio');
 
-  const svc = await repo.createDbService({ ...data, createdBy: actor.id });
+  const svc = await repo.createDbService({ ...data, createdBy: actor.id, ownerTeamId: teamAccess.ownerTeamFor(actor) });
 
   await audit({
     actorId: actor.id, actorUsername: actor.username,
@@ -213,6 +218,7 @@ async function createDbService(data, actor) {
 async function updateDbService(id, data, actor) {
   const existing = await repo.findDbServiceById(id);
   if (!existing) throw new NotFoundError('Servicio de BD no encontrado');
+  teamAccess.assertCanModify(actor, 'DB', existing.owner_team_id);
 
   if (!data.name || data.name.trim().length < 2)
     throw new ValidationError('El nombre es obligatorio');
@@ -237,6 +243,7 @@ async function updateDbService(id, data, actor) {
 async function toggleDbServiceEstado(id, actor) {
   const existing = await repo.findDbServiceById(id);
   if (!existing) throw new NotFoundError('Servicio de BD no encontrado');
+  teamAccess.assertCanModify(actor, 'DB', existing.owner_team_id);
 
   // Solo se comprueba al DESACTIVAR: el toggle es bidireccional y reactivar debe
   // seguir siendo posible siempre.
@@ -274,6 +281,7 @@ async function toggleDbServiceEstado(id, actor) {
 async function deleteDbService(id, actor) {
   const existing = await repo.findDbServiceById(id);
   if (!existing) throw new NotFoundError('Servicio de BD no encontrado');
+  teamAccess.assertCanModify(actor, 'DB', existing.owner_team_id);
 
   const creds = await repo.countCredentialsByDbService(id);
   if (creds > 0)

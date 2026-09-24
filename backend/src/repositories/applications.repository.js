@@ -14,7 +14,7 @@ async function findAll({ page = 1, limit = 20, search = '', environmentId = null
 
   const { rows } = await query(
     `SELECT
-       a.id, a.code, a.name, a.app_type, a.url, a.description,
+       a.id, a.code, a.name, a.app_type, a.url, a.description, a.owner_team_id,
        a.estado, a.estado_registro, a.created_at, a.updated_at,
        e.id   AS environment_id,   e.code AS environment_code,   e.name AS environment_name, e.prd_flag,
        s.id   AS server_id, s.code AS server_code, s.name AS server_name, s.hostname AS server_hostname
@@ -46,7 +46,7 @@ async function findAll({ page = 1, limit = 20, search = '', environmentId = null
 async function findById(id) {
   const { rows } = await query(
     `SELECT
-       a.id, a.code, a.name, a.app_type, a.url, a.description,
+       a.id, a.code, a.name, a.app_type, a.url, a.description, a.owner_team_id,
        a.estado, a.estado_registro, a.created_at, a.updated_at,
        a.environment_id, a.server_id,
        e.code AS environment_code, e.name AS environment_name, e.prd_flag,
@@ -79,11 +79,11 @@ async function countCredentials(appId) {
   return parseInt(rows[0].total, 10);
 }
 
-async function create({ name, appType, url, environmentId, serverId, description, createdBy }) {
+async function create({ name, appType, url, environmentId, serverId, description, createdBy, ownerTeamId }) {
   const { rows: [ins] } = await query(
     `INSERT INTO sch_system.tbl_applications
-       (code, name, app_type, url, environment_id, server_id, description, created_by)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7)
+       (code, name, app_type, url, environment_id, server_id, description, created_by, owner_team_id)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, environment_id`,
     [
       name.trim(),
@@ -93,6 +93,7 @@ async function create({ name, appType, url, environmentId, serverId, description
       serverId    || null,
       description || null,
       createdBy,
+      ownerTeamId || null,
     ]
   );
   const { rows } = await query(

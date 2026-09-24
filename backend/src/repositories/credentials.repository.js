@@ -237,6 +237,7 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
     `SELECT
        c.id, c.resource_type,
        c.server_id, c.db_service_id, c.application_id, c.network_device_id,
+       c.owner_team_id, ot.code AS owner_team_code,
        c.username, c.description, c.notes,
        c.is_custodied, c.custodian_user_id,
        cu.username  AS custodian_username,
@@ -267,6 +268,7 @@ async function findAll({ page = 1, limit = 20, search = '', resourceTypes = null
      LEFT JOIN sch_system.tbl_network_devices n  ON n.id   = c.network_device_id
      LEFT JOIN sch_system.tbl_environment    en  ON en.id  = n.environment_id
      LEFT JOIN sch_system.tbl_users          cu  ON cu.id  = c.custodian_user_id
+     LEFT JOIN sch_system.tbl_teams          ot  ON ot.id  = c.owner_team_id
      WHERE c.estado_registro = 'O'
        AND ($3::text[] IS NULL OR c.resource_type = ANY($3::text[]))
        AND ($4::text IS NULL OR (
@@ -318,6 +320,7 @@ async function findById(id) {
     `SELECT
        c.id, c.resource_type,
        c.server_id, c.db_service_id, c.application_id, c.network_device_id,
+       c.owner_team_id, ot.code AS owner_team_code,
        c.username, c.description, c.notes,
        c.is_custodied, c.custodian_user_id,
        cu.username  AS custodian_username,
@@ -343,6 +346,7 @@ async function findById(id) {
      LEFT JOIN sch_system.tbl_network_devices n  ON n.id   = c.network_device_id
      LEFT JOIN sch_system.tbl_environment    en  ON en.id  = n.environment_id
      LEFT JOIN sch_system.tbl_users          cu  ON cu.id  = c.custodian_user_id
+     LEFT JOIN sch_system.tbl_teams          ot  ON ot.id  = c.owner_team_id
      WHERE c.id = $1 AND c.estado_registro = 'O'`,
     [id]
   );
@@ -368,7 +372,7 @@ async function decryptPassword(id, masterKey) {
 // ---------------------------------------------------------------------------
 
 async function create({
-  serverId, dbServiceId, applicationId, networkDeviceId, resourceType, username,
+  serverId, dbServiceId, applicationId, networkDeviceId, ownerTeamId, resourceType, username,
   plainPassword, description, notes,
   isCustodied, custodianUserId, createdBy,
 }) {
@@ -379,11 +383,11 @@ async function create({
           username, password_encrypted,
           description, notes,
           is_custodied, custodian_user_id, custodian_since,
-          estado_registro, estado, created_by, network_device_id)
+          estado_registro, estado, created_by, network_device_id, owner_team_id)
        VALUES ($1, $2, $3, $4, $5, ${encryptQuery(6, 7)},
                $8, $9,
                $10, $11, $12,
-               'O', 'AI', $13, $14)
+               'O', 'AI', $13, $14, $15)
        RETURNING id, username, resource_type`,
       [
         serverId        || null,
@@ -399,6 +403,7 @@ async function create({
         isCustodied ? new Date() : null,
         createdBy,
         networkDeviceId || null,
+        ownerTeamId     || null,
       ]
     );
     return rows[0];

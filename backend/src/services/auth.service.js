@@ -433,6 +433,8 @@ async function completarLogin(user, { ipAddress, userAgent, extra }) {
       roleLevel:         user.role_level,
       team:              user.team || null,
       teamResourceTypes: user.team_resource_types || [],
+      teamReadOnlyTypes: user.team_read_only_types || [],
+      teamId:            user.team_id ?? null,
       forcePwdChange:    user.force_pwd_change,
       mfaEnabled:        user.mfa_enabled === true,
       authSource:        user.auth_source || 'LOCAL',

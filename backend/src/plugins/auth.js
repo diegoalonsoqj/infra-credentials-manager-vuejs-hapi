@@ -67,10 +67,15 @@ const SESSION_QUERY = `
     r.id        AS role_id,
     r.level     AS role_level,
     t.code      AS team,
+    u.team_id,
     COALESCE(
       ARRAY_AGG(DISTINCT trt.resource_type) FILTER (WHERE trt.resource_type IS NOT NULL),
       ARRAY[]::varchar[]
     ) AS team_resource_types,
+    COALESCE(
+      ARRAY_AGG(DISTINCT trt.resource_type) FILTER (WHERE trt.access_level = 'READ'),
+      ARRAY[]::varchar[]
+    ) AS team_read_only_types,
     COALESCE(
       ARRAY_AGG(DISTINCT p.code ORDER BY p.code) FILTER (WHERE p.code IS NOT NULL),
       ARRAY[]::varchar[]
@@ -87,7 +92,7 @@ const SESSION_QUERY = `
     AND s.expires_at > NOW()
   GROUP BY s.id, u.id, u.username, u.first_name, u.last_name, u.full_name,
            u.estado, u.estado_registro, u.locked_until, u.force_pwd_change, u.mfa_enabled,
-           u.auth_source, r.code, r.id, r.level, t.code`;
+           u.auth_source, u.team_id, r.code, r.id, r.level, t.code`;
 
 /**
  * Comparacion de dos secretos en tiempo constante.
@@ -207,7 +212,10 @@ async function authenticate(request, h) {
         roleId:            session.role_id,
         level:             session.role_level,
         team:              session.team || null,
+        teamId:            session.team_id ?? null,
         teamResourceTypes: session.team_resource_types || [],
+        // Tipos con acceso de consulta (migración 022, services/teamAccess.js).
+        teamReadOnlyTypes: session.team_read_only_types || [],
         permissions:       session.permissions || [],
         sessionId:         session.session_id,
         // Lo consume plugins/passwordChangeGuard.js: mientras esté a TRUE la

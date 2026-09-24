@@ -103,7 +103,7 @@ infra-credentials-manager-vuejs/
 │   ├── dist/                # build de producción (generado)
 │   └── vite.config.js
 ├── database/
-│   ├── migrations/          # 001..021_*.sql (se aplican con npm run migrate)
+│   ├── migrations/          # 001..022_*.sql (se aplican con npm run migrate)
 │   └── seeds/               # 001_base_data.sql (roles, equipos, catálogos)
 ├── deploy/
 │   ├── nginx-icm.conf       # proxy inverso de ejemplo
@@ -461,6 +461,21 @@ Es idempotente y está pensado para cron.
     firewalls…), en el menú *Recursos → Networking*.
 
 El control de acceso es multinivel: nivel de rol + permisos + alcance por equipo.
+
+**Acceso por tipo en cada equipo** (*Catálogos → Equipos*). Cada tipo de recurso
+del equipo tiene un nivel:
+
+- **Completo**: ver y modificar todo lo de ese tipo (lo habitual).
+- **Consulta**: ver y descifrar todo lo de ese tipo (si el rol lo permite), pero
+  modificar solo lo que pertenece al propio equipo. Crear sí puede: lo que crea
+  pasa a ser de su equipo, y sus credenciales funcionan como las de cualquier
+  equipo (custodiadas o compartidas con sus miembros). Al descifrar una
+  credencial de **otro** equipo se pide un **motivo**, que queda en la auditoría.
+
+Es el caso de un equipo de Monitoreo que hace los pases y atiende fuera de
+horario: consulta en DB, OS, APP y NET, y gestiona sus propios desarrollos. Cada
+credencial y cada recurso guarda el equipo de quien lo creó; lo que ya existía o
+crea un ADMIN no tiene equipo, y para un equipo con consulta es de solo lectura.
 
 ---
 

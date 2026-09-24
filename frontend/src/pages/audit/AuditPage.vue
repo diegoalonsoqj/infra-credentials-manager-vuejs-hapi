@@ -88,6 +88,10 @@
                   <span v-if="row.resource_name">{{ row.resource_name }}</span>
                   <span v-else class="text-medium-emphasis">—</span>
                   <div v-if="row.fail_reason" class="text-danger" style="font-size: 11px">{{ row.fail_reason }}</div>
+                  <!-- Motivo que se pide al descifrar, con acceso de consulta, una credencial de otro equipo -->
+                  <div v-if="extraOf(row).motivo" class="text-medium-emphasis" style="font-size: 11px">
+                    <strong>Motivo:</strong> {{ extraOf(row).motivo }}
+                  </div>
                 </CTableDataCell>
                 <CTableDataCell>
                   <CBadge :color="RESULT_LABELS[row.result]?.color || 'secondary'">
@@ -196,6 +200,14 @@ const availableActions = ref([])
 
 const totalPages = computed(() => Math.ceil(total.value / limit.value) || 1)
 const hasFilters = computed(() => Object.values(applied).some(Boolean))
+
+// extra_data llega como objeto (JSONB); se tolera texto por si acaso.
+function extraOf(row) {
+  const e = row.extra_data
+  if (!e) return {}
+  if (typeof e === 'object') return e
+  try { return JSON.parse(e) } catch { return {} }
+}
 
 function paginationPages(current, tot) {
   if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1)

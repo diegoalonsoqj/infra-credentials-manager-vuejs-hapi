@@ -5,6 +5,8 @@ const resourcesRepo = require('../repositories/resources.repository');
 const { query } = require('../config/database');
 const { AUDIT_ACTIONS, RESULT } = require('../config/constants');
 const logger    = require('../utils/logger');
+// Acceso de consulta por tipo: solo se modifica lo del propio equipo (migración 022).
+const teamAccess = require('./teamAccess');
 
 // =============================================================================
 // networkDevices.service.js — Lógica de negocio para tbl_network_devices.
@@ -57,7 +59,7 @@ async function getDevice(id) {
 }
 
 async function createDevice(data, actor) {
-  const device = await repo.create({ ...data, createdBy: actor.id });
+  const device = await repo.create({ ...data, createdBy: actor.id, ownerTeamId: teamAccess.ownerTeamFor(actor) });
 
   await audit({
     actorId: actor.id, actorUsername: actor.username,
@@ -72,6 +74,7 @@ async function createDevice(data, actor) {
 async function updateDevice(id, data, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Dispositivo de red no encontrado');
+  teamAccess.assertCanModify(actor, 'NET', existing.owner_team_id);
 
   const updated = await repo.update(id, data);
   if (!updated) throw new NotFoundError('Dispositivo de red no encontrado');
@@ -89,6 +92,7 @@ async function updateDevice(id, data, actor) {
 async function toggleDeviceEstado(id, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Dispositivo de red no encontrado');
+  teamAccess.assertCanModify(actor, 'NET', existing.owner_team_id);
 
   // Solo al DESACTIVAR, igual que servidores y aplicaciones: el descifrado
   // filtra por el estado de la credencial, no por el del recurso, así que
@@ -120,6 +124,7 @@ async function toggleDeviceEstado(id, actor) {
 async function deleteDevice(id, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Dispositivo de red no encontrado');
+  teamAccess.assertCanModify(actor, 'NET', existing.owner_team_id);
 
   const creds = await repo.countCredentials(id);
   if (creds > 0) {

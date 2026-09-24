@@ -93,7 +93,8 @@
                     <CBadge :color="ESTADO_COLOR[dev.estado]">{{ ESTADO_LABEL[dev.estado] }}</CBadge>
                   </CTableDataCell>
                   <CTableDataCell class="text-end">
-                    <div v-if="canWrite || canDelete" class="d-flex gap-1 justify-content-end">
+                    <div v-if="(canWrite || canDelete) && authStore.canModifyOwned('NET', dev.owner_team_id)"
+                      class="d-flex gap-1 justify-content-end">
                       <template v-if="canWrite">
                         <CButton size="sm" color="secondary" variant="outline" title="Editar"
                           @click="openModal('edit', dev)">

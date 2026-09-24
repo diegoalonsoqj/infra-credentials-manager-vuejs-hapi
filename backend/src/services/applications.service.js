@@ -4,6 +4,8 @@ const repo      = require('../repositories/applications.repository');
 const { query } = require('../config/database');
 const { AUDIT_ACTIONS, RESULT } = require('../config/constants');
 const logger    = require('../utils/logger');
+// Acceso de consulta por tipo: solo se modifica lo del propio equipo (migración 022).
+const teamAccess = require('./teamAccess');
 
 // =============================================================================
 // applications.service.js — Lógica de negocio para tbl_applications.
@@ -55,7 +57,7 @@ async function createApplication(data, actor) {
   if (appType && !APP_TYPES.includes(appType))
     throw new ValidationError(`Tipo de app inválido. Valores permitidos: ${APP_TYPES.join(', ')}`);
 
-  const app = await repo.create({ ...data, createdBy: actor.id });
+  const app = await repo.create({ ...data, createdBy: actor.id, ownerTeamId: teamAccess.ownerTeamFor(actor) });
 
   await audit({
     actorId: actor.id, actorUsername: actor.username,
@@ -70,6 +72,7 @@ async function createApplication(data, actor) {
 async function updateApplication(id, data, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Aplicación no encontrada');
+  teamAccess.assertCanModify(actor, 'APP', existing.owner_team_id);
 
   const { name, appType, environmentId } = data;
 
@@ -96,6 +99,7 @@ async function updateApplication(id, data, actor) {
 async function toggleApplicationEstado(id, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Aplicación no encontrada');
+  teamAccess.assertCanModify(actor, 'APP', existing.owner_team_id);
 
   // Solo se comprueba al DESACTIVAR: el toggle es bidireccional y reactivar debe
   // seguir siendo posible siempre.
@@ -133,6 +137,7 @@ async function toggleApplicationEstado(id, actor) {
 async function deleteApplication(id, actor) {
   const existing = await repo.findById(id);
   if (!existing) throw new NotFoundError('Aplicación no encontrada');
+  teamAccess.assertCanModify(actor, 'APP', existing.owner_team_id);
 
   const creds = await repo.countCredentials(id);
   if (creds > 0)

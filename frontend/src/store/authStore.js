@@ -73,5 +73,28 @@ export const useAuthStore = defineStore('auth', {
       if (!this.user) return false
       return (this.user.permissions || []).includes(permissionCode)
     },
+
+    // -------------------------------------------------------------------------
+    // Nivel de acceso por tipo del equipo (backend: services/teamAccess.js).
+    // Aquí solo decide qué botones se muestran: quien manda es el backend, que
+    // lo vuelve a comprobar en cada petición.
+    // -------------------------------------------------------------------------
+
+    /** El equipo del usuario solo tiene acceso de consulta a ese tipo. */
+    isReadOnlyType(type) {
+      if (!this.user || (this.user.roleLevel || 0) >= 100) return false
+      return (this.user.teamReadOnlyTypes || []).includes(type)
+    },
+
+    /** Puede modificar un recurso o credencial de ese tipo y equipo propietario. */
+    canModifyOwned(type, ownerTeamId) {
+      if (!this.isReadOnlyType(type)) return true
+      return this.user.teamId != null && ownerTeamId != null && Number(ownerTeamId) === Number(this.user.teamId)
+    },
+
+    /** Descifrar esta credencial le pedirá un motivo (es de otro equipo). */
+    needsDecryptReason(cred) {
+      return this.isReadOnlyType(cred.resource_type) && !this.canModifyOwned(cred.resource_type, cred.owner_team_id)
+    },
   },
 })

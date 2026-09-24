@@ -314,7 +314,11 @@ async function findAllTeams() {
             COALESCE(
               ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.resource_type IS NOT NULL),
               ARRAY[]::varchar[]
-            ) AS resource_types
+            ) AS resource_types,
+            COALESCE(
+              ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.access_level = 'READ'),
+              ARRAY[]::varchar[]
+            ) AS read_only_types
      FROM sch_system.tbl_teams t
      LEFT JOIN sch_system.tbl_team_resource_types trt ON trt.team_id = t.id
      WHERE t.estado_registro = 'O'
@@ -330,7 +334,11 @@ async function findTeamById(id) {
             COALESCE(
               ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.resource_type IS NOT NULL),
               ARRAY[]::varchar[]
-            ) AS resource_types
+            ) AS resource_types,
+            COALESCE(
+              ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.access_level = 'READ'),
+              ARRAY[]::varchar[]
+            ) AS read_only_types
      FROM sch_system.tbl_teams t
      LEFT JOIN sch_system.tbl_team_resource_types trt ON trt.team_id = t.id
      WHERE t.id = $1 AND t.estado_registro = 'O'
@@ -371,7 +379,7 @@ async function countUsersByTeam(teamId) {
 // Lo segundo es un parpadeo; lo primero dejaba a todo el equipo sin acceso
 // hasta que alguien volviera a guardar. El ámbito falla cerrado, así que no
 // abría accesos: los cortaba.
-async function createTeam({ code, name, resourceTypes, description }) {
+async function createTeam({ code, name, resourceTypes, readOnlyTypes = [], description }) {
   return withTransaction(async (client) => {
     // Insertar equipo (sin resource_type, ahora en junction table)
     const { rows } = await client.query(
@@ -382,20 +390,21 @@ async function createTeam({ code, name, resourceTypes, description }) {
     );
     const team = rows[0];
 
-    // Insertar tipos de recurso en junction table
+    // Insertar tipos de recurso en junction table, con su nivel de acceso
     for (const rt of resourceTypes) {
       await client.query(
-        `INSERT INTO sch_system.tbl_team_resource_types (team_id, resource_type) VALUES ($1, $2)`,
-        [team.id, rt]
+        `INSERT INTO sch_system.tbl_team_resource_types (team_id, resource_type, access_level) VALUES ($1, $2, $3)`,
+        [team.id, rt, readOnlyTypes.includes(rt) ? 'READ' : 'FULL']
       );
     }
 
     team.resource_types = [...resourceTypes].sort();
+    team.read_only_types = [...readOnlyTypes].sort();
     return team;
   });
 }
 
-async function updateTeam(id, { name, description, resourceTypes }) {
+async function updateTeam(id, { name, description, resourceTypes, readOnlyTypes = [] }) {
   return withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE sch_system.tbl_teams
@@ -411,12 +420,13 @@ async function updateTeam(id, { name, description, resourceTypes }) {
     await client.query(`DELETE FROM sch_system.tbl_team_resource_types WHERE team_id = $1`, [id]);
     for (const rt of resourceTypes) {
       await client.query(
-        `INSERT INTO sch_system.tbl_team_resource_types (team_id, resource_type) VALUES ($1, $2)`,
-        [id, rt]
+        `INSERT INTO sch_system.tbl_team_resource_types (team_id, resource_type, access_level) VALUES ($1, $2, $3)`,
+        [id, rt, readOnlyTypes.includes(rt) ? 'READ' : 'FULL']
       );
     }
 
     team.resource_types = [...resourceTypes].sort();
+    team.read_only_types = [...readOnlyTypes].sort();
     return team;
   });
 }

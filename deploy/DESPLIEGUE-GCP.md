@@ -387,6 +387,12 @@ que migrar con la aplicación en marcha no la interrumpe.
 | `019_network_devices.sql` | Tipo de recurso NET: dispositivos de red, catálogo de productos de red y equipo NETOPS | Dar de alta dispositivos en *Recursos → Networking* y asignar el equipo NETOPS a quien corresponda. Si ya existía un equipo llamado NETOPS, la migración **no** le da acceso a NET: asígnalo desde *Catálogos → Equipos* si procede |
 | `020_team_audit.sql` | Rol **LEADER** (Líder de equipo) y permiso `AUDIT_TEAM`: auditoría de los recursos de su equipo | Asignar el rol LEADER a los líderes en *Usuarios*. Un líder de varias áreas (p. ej. redes y sysadmin) va en un equipo con esos tipos (OS + NET) |
 | `021_supervisor_role.sql` | Rol **SUPERVISOR** (Supervisor de equipo): auditoría e inventario de su equipo, sin acceso a credenciales | Asignarlo, con su equipo, a los líderes que supervisan pero no deben ver ni crear credenciales |
+| `022_team_access_levels.sql` | Nivel de acceso por tipo en cada equipo (**Completo** / **Consulta**), equipo propietario de credenciales y recursos, y motivo al descifrar credenciales de otro equipo | **Obligatoria antes de reiniciar**: sin ella nadie puede iniciar sesión (ver aviso abajo). Después, crear el equipo de Monitoreo con DB, OS, APP y NET en *Consulta* |
+
+> ⚠️ **Migra siempre antes de reiniciar el backend.** Desde la 022 la sesión lee
+> columnas nuevas: si el código nuevo arranca sin la migración aplicada, todas las
+> peticiones fallan con `401 Error de autenticación` y nadie puede entrar. Se
+> arregla aplicando `npm run migrate` y reiniciando; no se pierde nada.
 
 ---
 

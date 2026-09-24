@@ -7,6 +7,7 @@ const {
   paginationQuery, queryId,
 } = require('../validation');
 const { clientIp } = require('../utils/clientIp');
+const { actorAccess } = require('../services/teamAccess');
 
 // =============================================================================
 // resources.routes.js — Servidores (equipo OS) y servicios de BD (equipo DB).
@@ -26,7 +27,7 @@ const canDeleteOS = [requirePermission('RES_DELETE'), requireTeamScope('OS')];
 
 function actor(request) {
   const user = request.auth.credentials;
-  return { id: user.id, username: user.username, ip: clientIp(request) };
+  return { id: user.id, username: user.username, ip: clientIp(request), ...actorAccess(user) };
 }
 
 /**
@@ -40,6 +41,9 @@ function handleError(h, err) {
   }
   if (err.isNotFound) {
     return h.response({ success: false, code: 'NOT_FOUND', message: err.message }).code(404);
+  }
+  if (err.isForbidden) {
+    return h.response({ success: false, code: 'FORBIDDEN', message: err.message }).code(403);
   }
   // Cualquier otro error se propaga al manejador global (plugins/errors.js).
   // Antes se devolvia aqui un 500 mudo: el fallo no llegaba a los logs y el

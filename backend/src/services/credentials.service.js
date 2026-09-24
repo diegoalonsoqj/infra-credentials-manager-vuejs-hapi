@@ -6,6 +6,10 @@ const { query, withTransaction } = require('../config/database');
 const { AUDIT_ACTIONS, RESULT, ROLE_LEVELS } = require('../config/constants');
 const logger = require('../utils/logger');
 const custody = require('./custody');
+const teamAccess = require('./teamAccess');
+
+// Motivo mínimo al descifrar con acceso de consulta: algo más que "x".
+const REASON_MIN_LENGTH = 5;
 
 // =============================================================================
 // credentials.service.js — Lógica de negocio para gestión de credenciales.
@@ -39,6 +43,9 @@ class NotFoundError extends Error {
 }
 class ForbiddenError extends Error {
   constructor(msg) { super(msg); this.name = 'ForbiddenError'; this.isForbidden = true; }
+}
+class ReasonRequiredError extends Error {
+  constructor(msg) { super(msg); this.name = 'ReasonRequiredError'; this.isReasonRequired = true; }
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +191,7 @@ async function getCredential(id, actor) {
  *
  * @returns {{ plain_password: string }}
  */
-async function decryptPassword(id, actor) {
+async function decryptPassword(id, actor, { reason = '' } = {}) {
   const cred = await repo.findById(id);
 
   if (!cred) {
@@ -259,6 +266,18 @@ async function decryptPassword(id, actor) {
     );
   }
 
+  // Acceso de consulta sobre el tipo y credencial de otro equipo (p. ej.
+  // Monitoreo en un pase fuera de horario): se exige un motivo, que queda en la
+  // auditoría y lo ven los líderes del área. No se audita el rechazo: todavía
+  // no se ha revelado nada y el usuario solo tiene que escribir el motivo.
+  const motivo = String(reason || '').trim();
+  const reasonRequired = teamAccess.needsDecryptReason(actor, cred);
+  if (reasonRequired && motivo.length < REASON_MIN_LENGTH) {
+    throw new ReasonRequiredError(
+      'Esta credencial es de otro equipo: indica el motivo del acceso (p. ej. el incidente que atiendes).'
+    );
+  }
+
   // Descifrar — la MASTER_KEY va desde process.env, nunca del request
   const masterKey = process.env.MASTER_KEY;
   if (!masterKey) {
@@ -286,6 +305,8 @@ async function decryptPassword(id, actor) {
     extra: {
       environment: cred.environment_code,
       infrastructure: cred.infrastructure_code,
+      ...(motivo ? { motivo } : {}),
+      ...(reasonRequired ? { accesoConsulta: true } : {}),
     },
     required: true,
   });
@@ -413,6 +434,9 @@ async function createCredential(data, actor) {
     applicationId,
     networkDeviceId,
     resourceType,
+    // Equipo propietario: el de quien la crea (NULL si es ADMIN). Con acceso
+    // de consulta, es lo único que ese equipo podrá modificar después.
+    ownerTeamId: teamAccess.ownerTeamFor(actor),
     username,
     plainPassword: password,
     description,
@@ -455,6 +479,9 @@ async function updateCredential(id, data, actor) {
   if (allowedTypes && !allowedTypes.includes(cred.resource_type)) {
     throw new ForbiddenError('No tienes acceso a este tipo de credencial.');
   }
+
+  // Acceso de consulta sobre el tipo: solo se modifica lo del propio equipo.
+  teamAccess.assertCanModify(actor, cred.resource_type, cred.owner_team_id);
 
   // Custodia exclusiva — solo el custodio puede editar
   if (cred.is_custodied && cred.custodian_user_id !== actor.id) {
@@ -504,6 +531,8 @@ async function toggleEstado(id, actor) {
     throw new ForbiddenError('No tienes acceso a este tipo de credencial.');
   }
 
+  teamAccess.assertCanModify(actor, cred.resource_type, cred.owner_team_id);
+
   // Custodia exclusiva — solo el custodio puede activar/desactivar
   if (cred.is_custodied && cred.custodian_user_id !== actor.id) {
     await auditAction({
@@ -547,6 +576,8 @@ async function deleteCredential(id, actor) {
   if (allowedTypes && !allowedTypes.includes(cred.resource_type)) {
     throw new ForbiddenError('No tienes acceso a este tipo de credencial.');
   }
+
+  teamAccess.assertCanModify(actor, cred.resource_type, cred.owner_team_id);
 
   // Custodia exclusiva — solo el custodio puede eliminar
   if (cred.is_custodied && cred.custodian_user_id !== actor.id) {

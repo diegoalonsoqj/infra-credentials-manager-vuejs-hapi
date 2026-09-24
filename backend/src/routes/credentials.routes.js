@@ -68,7 +68,7 @@ module.exports = {
         options: {
           auth: 'session',
           pre: [requirePermission('CRED_REVEAL'), decryptLimiter],
-          validate: validate({ params: ctrl.credentialIdParam }),
+          validate: validate({ params: ctrl.credentialIdParam, payload: ctrl.decryptSchema }),
         },
         handler: ctrl.decryptPassword,
       },

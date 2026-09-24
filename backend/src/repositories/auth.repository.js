@@ -28,10 +28,15 @@ function loginUserSql(campo) {
        r.code  AS role,
        r.level AS role_level,
        t.code  AS team,
+       u.team_id,
        COALESCE(
          ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.resource_type IS NOT NULL),
          ARRAY[]::varchar[]
-       ) AS team_resource_types
+       ) AS team_resource_types,
+       COALESCE(
+         ARRAY_AGG(trt.resource_type ORDER BY trt.resource_type) FILTER (WHERE trt.access_level = 'READ'),
+         ARRAY[]::varchar[]
+       ) AS team_read_only_types
      FROM sch_system.tbl_users u
      JOIN sch_system.tbl_roles r ON r.id = u.role_id
      LEFT JOIN sch_system.tbl_teams                t   ON t.id = u.team_id

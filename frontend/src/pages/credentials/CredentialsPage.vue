@@ -114,7 +114,8 @@
                         <Unlock :size="14" />
                       </CButton>
                     </template>
-                    <template v-if="canWrite">
+                    <!-- Con acceso de consulta al tipo, solo se modifica lo del propio equipo -->
+                    <template v-if="canWrite && authStore.canModifyOwned(cred.resource_type, cred.owner_team_id)">
                       <CButton color="info" size="sm" variant="outline"
                         :title="!canOperateCustodied(cred) ? `Solo el custodio (${cred.custodian_username}) puede editar` : 'Editar'"
                         @click="openEdit(cred)"
@@ -131,7 +132,7 @@
                         <CheckCircle2 v-else :size="14" />
                       </CButton>
                     </template>
-                    <template v-if="canDelete">
+                    <template v-if="canDelete && authStore.canModifyOwned(cred.resource_type, cred.owner_team_id)">
                       <CButton color="danger" size="sm" variant="outline"
                         :title="!canOperateCustodied(cred) ? `Solo el custodio (${cred.custodian_username}) puede eliminar` : 'Eliminar'"
                         @click="openDelete(cred)"
@@ -443,6 +444,13 @@
               <td><CBadge :color="detailCred.estado === 'AI' ? 'success' : 'secondary'">{{ detailCred.estado === 'AI' ? 'Activa' : 'Inactiva' }}</CBadge></td>
             </tr>
             <tr>
+              <td class="text-medium-emphasis pe-3" style="vertical-align: top">Equipo propietario</td>
+              <td>
+                <CBadge v-if="detailCred.owner_team_code" color="secondary">{{ detailCred.owner_team_code }}</CBadge>
+                <span v-else class="text-medium-emphasis">— (sin equipo)</span>
+              </td>
+            </tr>
+            <tr>
               <td class="text-medium-emphasis pe-3" style="vertical-align: top">Custodia</td>
               <td>
                 <span v-if="detailCred.is_custodied" class="d-flex align-items-center gap-2">
@@ -487,6 +495,22 @@
           <CSpinner size="sm" />
           <span class="ms-2 small">Descifrando...</span>
         </div>
+        <!-- Credencial de otro equipo con acceso de consulta: motivo antes de descifrar -->
+        <form v-else-if="askReason" @submit.prevent="doDecrypt">
+          <CAlert color="info" class="py-2 small mb-3">
+            Esta credencial es de otro equipo. Indica el motivo del acceso: quedará en la
+            auditoría, junto con tu usuario, y lo verán los responsables de esa área.
+          </CAlert>
+          <CAlert v-if="decryptError" color="danger" class="py-2 small">{{ decryptError }}</CAlert>
+          <CFormLabel class="small fw-semibold">Motivo *</CFormLabel>
+          <CFormTextarea v-model="decryptReason" rows="2" maxlength="500"
+            placeholder="Ej: INC-1234, caída de la BD de ventas fuera de horario" />
+          <div class="d-flex justify-content-end mt-3">
+            <CButton type="submit" color="primary" size="sm" :disabled="decryptReason.trim().length < REASON_MIN">
+              <Unlock :size="14" class="me-1" /> Descifrar
+            </CButton>
+          </div>
+        </form>
         <CAlert v-else-if="decryptError" color="danger" class="py-2 small">{{ decryptError }}</CAlert>
         <template v-else-if="plainPassword">
           <CAlert color="warning" class="py-2 small mb-3">
@@ -601,6 +625,11 @@ const plainPassword  = ref('')
 const countdown      = ref(0)
 const copied         = ref(false)
 const showDecryptPwd = ref(false)
+// Motivo del acceso: lo exige el backend al descifrar, con acceso de consulta,
+// una credencial de otro equipo. Queda en la auditoría.
+const askReason      = ref(false)
+const decryptReason  = ref('')
+const REASON_MIN     = 5
 const detailCred     = ref(null)
 let countdownTimer = null
 
@@ -723,12 +752,23 @@ async function handleReassign() {
   finally { reassignSaving.value = false }
 }
 
-async function openDecrypt(cred) {
+function openDecrypt(cred) {
   selected.value = cred; plainPassword.value = ''; decryptError.value = null
   copied.value = false; countdown.value = decryptTimeoutSecs.value
-  showDecryptPwd.value = false; decrypting.value = true; showDecrypt.value = true
+  showDecryptPwd.value = false; showDecrypt.value = true
+  decryptReason.value = ''
+  // Credencial de otro equipo con acceso de consulta: primero se pide el motivo.
+  askReason.value = authStore.needsDecryptReason(cred)
+  if (!askReason.value) doDecrypt()
+}
+
+async function doDecrypt() {
+  const cred = selected.value
+  decryptError.value = null; decrypting.value = true
   try {
-    const data = await api.post(`/credentials/${cred.id}/decrypt`)
+    const body = decryptReason.value.trim() ? { reason: decryptReason.value.trim() } : undefined
+    const data = await api.post(`/credentials/${cred.id}/decrypt`, body)
+    askReason.value = false
     plainPassword.value = data.plain_password || ''
     let secs = decryptTimeoutSecs.value
     countdownTimer = setInterval(() => {
@@ -742,8 +782,12 @@ async function openDecrypt(cred) {
         if (hasCopied) { hasCopied = false; requestClipboardClear() }
       }
     }, 1000)
-  } catch (err) { decryptError.value = err?.message || 'No se pudo descifrar la contraseña.' }
-  finally { decrypting.value = false }
+  } catch (err) {
+    // El backend decide: si pide motivo (p. ej. la sesión del navegador es
+    // anterior al cambio de acceso del equipo), se muestra el paso del motivo.
+    if (err?.code === 'REASON_REQUIRED') askReason.value = true
+    decryptError.value = err?.message || 'No se pudo descifrar la contraseña.'
+  } finally { decrypting.value = false }
 }
 
 function closeDecrypt() {

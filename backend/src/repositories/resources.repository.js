@@ -98,7 +98,7 @@ async function findAllServers({ page = 1, limit = 20, search = '', environmentId
   const { rows } = await query(
     `SELECT
        s.id, s.code, s.hostname, s.name, s.ip_address::text,
-       s.project_id, s.description,
+       s.project_id, s.description, s.owner_team_id,
        s.estado, s.estado_registro, s.created_at, s.updated_at,
        e.id   AS environment_id,   e.code AS environment_code,   e.name AS environment_name, e.prd_flag,
        inf.id AS infrastructure_id, inf.code AS infrastructure_code, inf.name AS infrastructure_name,
@@ -141,7 +141,7 @@ async function findServerById(id) {
   const { rows } = await query(
     `SELECT
        s.id, s.code, s.hostname, s.name, s.ip_address::text,
-       s.project_id, s.description,
+       s.project_id, s.description, s.owner_team_id,
        s.estado, s.estado_registro, s.created_at, s.updated_at,
        s.environment_id, s.infrastructure_id, s.os_id, s.product_id,
        e.code AS environment_code,   e.name AS environment_name, e.prd_flag,
@@ -180,12 +180,12 @@ async function countCredentialsByServer(serverId) {
   return parseInt(rows[0].total, 10);
 }
 
-async function createServer({ hostname, name, ipAddress, infrastructureId, environmentId, projectId, productId, osId, description, createdBy }) {
+async function createServer({ hostname, name, ipAddress, infrastructureId, environmentId, projectId, productId, osId, description, createdBy, ownerTeamId }) {
   const { rows: [ins] } = await query(
     `INSERT INTO sch_system.tbl_servers
        (code, hostname, name, ip_address, infrastructure_id, environment_id,
-        project_id, product_id, os_id, description, created_by)
-     VALUES (gen_random_uuid()::text, $1, $2, $3::inet, $4, $5, $6, $7, $8, $9, $10)
+        project_id, product_id, os_id, description, created_by, owner_team_id)
+     VALUES (gen_random_uuid()::text, $1, $2, $3::inet, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id, environment_id`,
     [
       hostname.trim(), name.trim(),
@@ -197,6 +197,7 @@ async function createServer({ hostname, name, ipAddress, infrastructureId, envir
       osId               || null,
       description        || null,
       createdBy,
+      ownerTeamId        || null,
     ]
   );
   const { rows } = await query(
@@ -287,7 +288,7 @@ async function findAllDbServices({ page = 1, limit = 20, search = '', environmen
 
   const { rows } = await query(
     `SELECT
-       d.id, d.code, d.name, d.host, d.port, d.project_id, d.description,
+       d.id, d.code, d.name, d.host, d.port, d.project_id, d.description, d.owner_team_id,
        d.estado, d.estado_registro, d.created_at, d.updated_at,
        e.id   AS environment_id,   e.code AS environment_code,   e.name AS environment_name, e.prd_flag,
        inf.id AS infrastructure_id, inf.code AS infrastructure_code, inf.name AS infrastructure_name,
@@ -333,7 +334,7 @@ async function findAllDbServices({ page = 1, limit = 20, search = '', environmen
 async function findDbServiceById(id) {
   const { rows } = await query(
     `SELECT
-       d.id, d.code, d.name, d.host, d.port, d.project_id, d.description,
+       d.id, d.code, d.name, d.host, d.port, d.project_id, d.description, d.owner_team_id,
        d.estado, d.estado_registro, d.created_at, d.updated_at,
        d.environment_id, d.infrastructure_id, d.product_id, d.engine_id, d.server_id,
        e.code AS environment_code,   e.name AS environment_name, e.prd_flag,
@@ -374,12 +375,12 @@ async function countCredentialsByDbService(dbServiceId) {
   return parseInt(rows[0].total, 10);
 }
 
-async function createDbService({ name, host, port, infrastructureId, environmentId, projectId, productId, engineId, serverId, description, createdBy }) {
+async function createDbService({ name, host, port, infrastructureId, environmentId, projectId, productId, engineId, serverId, description, createdBy, ownerTeamId }) {
   const { rows: [ins] } = await query(
     `INSERT INTO sch_system.tbl_db_services
        (code, name, host, port, infrastructure_id, environment_id,
-        project_id, product_id, engine_id, server_id, description, created_by)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        project_id, product_id, engine_id, server_id, description, created_by, owner_team_id)
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id, environment_id`,
     [
       name.trim(), host.trim(),
@@ -392,6 +393,7 @@ async function createDbService({ name, host, port, infrastructureId, environment
       serverId           || null,
       description        || null,
       createdBy,
+      ownerTeamId        || null,
     ]
   );
   const { rows } = await query(
