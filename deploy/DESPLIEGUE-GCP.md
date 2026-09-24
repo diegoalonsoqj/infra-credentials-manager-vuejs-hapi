@@ -283,20 +283,107 @@ Y desde una de las IPs autorizadas, abre `http://203.0.113.50:8743`.
 
 ## 8. Actualizar a una versión nueva
 
+Resumen:
+
 ```bash
 cd /opt/icm
-git pull
-(cd frontend && npm ci && npm run build)
-(cd backend  && npm ci --omit=dev && npm run migrate -- --dry && npm run migrate)
-pm2 reload icm
+npm --prefix backend run backup                  # 1. copia antes de tocar la base
+git pull                                         # 2. código nuevo
+(cd backend  && npm ci --omit=dev)               # 3. dependencias
+(cd backend  && npm run migrate -- --dry)        # 4. qué migraciones faltan
+(cd backend  && npm run migrate)                 # 5. aplicarlas
+(cd frontend && npm ci && npm run build)         # 6. frontend
+pm2 reload icm                                   # 7. reiniciar el backend
+curl -s http://127.0.0.1:8743/api/health         # 8. comprobar
 ```
-
-Las migraciones nuevas no se aplican solas al arrancar: por eso `npm run migrate`
-va antes del `reload`.
 
 Si el cambio es solo del frontend, basta con `npm run build`: el backend sirve
 `frontend/dist` desde disco y no hace falta reiniciarlo (recarga el navegador con
 Ctrl+F5).
+
+### Migraciones de base de datos
+
+Las migraciones (`database/migrations/NNN_*.sql`) **no se aplican solas al
+arrancar**: el wizard las ejecuta una única vez al instalar, y a partir de ahí
+cada versión nueva que traiga migraciones exige `npm run migrate`. Si se
+reinicia el backend sin aplicarlas, las pantallas que usan las tablas nuevas
+fallan.
+
+> **Todos los `npm run` de este apartado se ejecutan dentro de `backend/`**, donde
+> está su `package.json`. Desde la raíz del repositorio fallan con
+> `ENOENT: no such file or directory, open '.../package.json'`.
+
+**1. Copia de seguridad antes de migrar.** No hay "deshacer" de una migración: la
+vuelta atrás es restaurar la copia (ver [`RECUPERACION.md`](./RECUPERACION.md)).
+
+```bash
+cd /opt/icm/backend
+npm run backup
+npm run backup -- --list        # comprueba que la copia de hoy aparece
+```
+
+**2. Ver qué falta, sin tocar nada:**
+
+```bash
+cd /opt/icm/backend
+npm run migrate -- --dry
+```
+
+```
+Migraciones aplicadas: 17
+Pendientes (2):
+    - 018_ldap_auth.sql
+    - 019_network_devices.sql
+
+(--dry: no se aplicó nada)
+```
+
+**3. Aplicar:**
+
+```bash
+cd /opt/icm/backend
+npm run migrate
+```
+
+Todas las pendientes se aplican **en una sola transacción**: si una falla, no se
+aplica ninguna y la base queda como estaba. Cada archivo aplicado queda registrado
+en `sch_system.tbl_migrations` con su checksum; volver a ejecutar el comando no
+repite nada (`✓ No hay migraciones pendientes.`).
+
+**4. Reiniciar y comprobar:**
+
+```bash
+pm2 reload icm
+pm2 logs icm --lines 30
+cd /opt/icm/backend && npm run migrate -- --dry   # debe decir: No hay migraciones pendientes
+```
+
+El orden importa: **primero migrar, después reiniciar**. El código nuevo cuenta
+con las tablas nuevas; el antiguo sigue funcionando con ellas mientras tanto, así
+que migrar con la aplicación en marcha no la interrumpe.
+
+### Errores habituales al migrar
+
+| Mensaje | Qué significa | Qué hacer |
+|---|---|---|
+| `INTEGRIDAD: estos archivos cambiaron después de aplicarse` | Un `.sql` ya aplicado fue editado en el servidor | No lo "arregles" editándolo: `git status` y `git checkout -- database/migrations/` para volver a la versión del repositorio |
+| `ENOENT ... open '.../package.json'` | Se ejecutó `npm run` fuera de `backend/` | `cd /opt/icm/backend` y repetir |
+| `No existe sch_system.tbl_migrations` | El sistema no está instalado | Completa primero el wizard (paso 6) |
+| `permission denied` / `must be owner of table` | El usuario de `DB_USER` no es dueño de las tablas | Aplícalo con el dueño, o ejecuta en la base `ALTER DATABASE icm_db OWNER TO icm_user;` y reasigna las tablas |
+| `password authentication failed` (28P01) | `DB_PASSWORD` del `.env` no es la correcta | Revísala; si lleva `#`, va entre comillas simples (`DB_PASSWORD='...'`) |
+| Cualquier otro error | La transacción se deshizo: la base no cambió | Revisa el mensaje, corrígelo y vuelve a ejecutar `npm run migrate` |
+
+> ⚠️ **Nunca apliques un `.sql` a mano con `psql`.** El registro de
+> `tbl_migrations` no se actualizaría, y la siguiente ejecución intentaría
+> aplicarlo de nuevo. Una migración ya aplicada tampoco se edita: el cambio va en
+> una migración nueva.
+
+### Qué trae cada migración reciente
+
+| Migración | Qué añade | Después de aplicarla |
+|---|---|---|
+| `018_ldap_auth.sql` | Autenticación con Active Directory / LDAP: origen de contraseña por usuario y ajustes `ldap_*` | Configurar la conexión en *Configuración → Directorio* (pide tu contraseña y segundo factor), probar y activar `ldap_enabled` |
+| `019_network_devices.sql` | Tipo de recurso NET: dispositivos de red, catálogo de productos de red y equipo NETOPS | Dar de alta dispositivos en *Recursos → Networking* y asignar el equipo NETOPS a quien corresponda. Si ya existía un equipo llamado NETOPS, la migración **no** le da acceso a NET: asígnalo desde *Catálogos → Equipos* si procede |
 
 ---
 
