@@ -197,6 +197,7 @@ const authStore = useAuthStore()
 const ROLE_LABELS = {
   ADMIN:    { label: 'Administrador', color: 'danger' },
   LEADER:   { label: 'Líder de equipo', color: 'dark' },
+  SUPERVISOR: { label: 'Supervisor de equipo', color: 'dark' },
   OPERATOR: { label: 'Operador',      color: 'warning' },
   VIEWER:   { label: 'Visor',         color: 'info' },
   VISITOR:  { label: 'Visitante',     color: 'secondary' },

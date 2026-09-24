@@ -171,6 +171,8 @@ const ACTION_LABELS = {
   RESOURCE_DB_CREATE: 'Crear base de datos', RESOURCE_DB_UPDATE: 'Editar base de datos',
   RESOURCE_DB_DELETE: 'Eliminar base de datos', RESOURCE_DB_INSTANCE_CREATE: 'Crear instancia BD',
   RESOURCE_DB_INSTANCE_UPDATE: 'Editar instancia BD', RESOURCE_DB_INSTANCE_DELETE: 'Eliminar instancia BD',
+  RESOURCE_OS_CREATE: 'Crear servidor', RESOURCE_OS_UPDATE: 'Editar servidor',
+  RESOURCE_OS_DELETE: 'Eliminar servidor',
   RESOURCE_APP_CREATE: 'Crear aplicación', RESOURCE_APP_UPDATE: 'Editar aplicación',
   RESOURCE_APP_DELETE: 'Eliminar aplicación',
   RESOURCE_NET_CREATE: 'Crear dispositivo de red', RESOURCE_NET_UPDATE: 'Editar dispositivo de red',

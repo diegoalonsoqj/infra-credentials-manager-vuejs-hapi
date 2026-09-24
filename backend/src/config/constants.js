@@ -9,6 +9,7 @@
 const ROLES = Object.freeze({
   ADMIN:    'ADMIN',
   LEADER:   'LEADER',
+  SUPERVISOR: 'SUPERVISOR',
   OPERATOR: 'OPERATOR',
   VIEWER:   'VIEWER',
   VISITOR:  'VISITOR',
@@ -62,6 +63,7 @@ const ENVIRONMENTS = Object.freeze({
 const ROLE_LEVELS = Object.freeze({
   ADMIN:    100,
   LEADER:   70,
+  SUPERVISOR: 60,
   OPERATOR: 50,
   VIEWER:   20,
   VISITOR:  0,
