@@ -331,9 +331,10 @@ npm run migrate -- --dry
 
 ```
 Migraciones aplicadas: 17
-Pendientes (2):
+Pendientes (3):
     - 018_ldap_auth.sql
     - 019_network_devices.sql
+    - 020_team_audit.sql
 
 (--dry: no se aplicó nada)
 ```
@@ -384,6 +385,7 @@ que migrar con la aplicación en marcha no la interrumpe.
 |---|---|---|
 | `018_ldap_auth.sql` | Autenticación con Active Directory / LDAP: origen de contraseña por usuario y ajustes `ldap_*` | Configurar la conexión en *Configuración → Directorio* (pide tu contraseña y segundo factor), probar y activar `ldap_enabled` |
 | `019_network_devices.sql` | Tipo de recurso NET: dispositivos de red, catálogo de productos de red y equipo NETOPS | Dar de alta dispositivos en *Recursos → Networking* y asignar el equipo NETOPS a quien corresponda. Si ya existía un equipo llamado NETOPS, la migración **no** le da acceso a NET: asígnalo desde *Catálogos → Equipos* si procede |
+| `020_team_audit.sql` | Rol **LEADER** (Líder de equipo) y permiso `AUDIT_TEAM`: auditoría de los recursos de su equipo | Asignar el rol LEADER a los líderes en *Usuarios*. Un líder de varias áreas (p. ej. redes y sysadmin) va en un equipo con esos tipos (OS + NET) |
 
 ---
 

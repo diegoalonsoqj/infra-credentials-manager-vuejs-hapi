@@ -52,7 +52,7 @@ const routes = [
       {
         path: 'audit',
         component: () => import('../pages/audit/AuditPage.vue'),
-        meta: { permission: 'MOD_AUDIT' },
+        meta: { anyPermission: ['MOD_AUDIT', 'AUDIT_TEAM'] },
       },
       {
         path: 'admin/users',
@@ -97,6 +97,10 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
+    return '/dashboard'
+  }
+  // Basta con uno de varios permisos (la auditoría: MOD_AUDIT o AUDIT_TEAM).
+  if (to.meta.anyPermission && !to.meta.anyPermission.some((p) => authStore.hasPermission(p))) {
     return '/dashboard'
   }
 

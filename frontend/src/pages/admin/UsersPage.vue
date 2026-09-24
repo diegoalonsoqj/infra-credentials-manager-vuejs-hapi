@@ -246,7 +246,7 @@ import ResetPwdForm from '../../components/users/ResetPwdForm.vue'
 
 // ─── Page state ───────────────────────────────────────────────────────────────
 
-const ROLE_COLORS  = { ADMIN: 'danger', OPERATOR: 'warning', VIEWER: 'info', VISITOR: 'secondary' }
+const ROLE_COLORS  = { ADMIN: 'danger', LEADER: 'dark', OPERATOR: 'warning', VIEWER: 'info', VISITOR: 'secondary' }
 const ESTADO_COLOR = { AI: 'success', IN: 'secondary' }
 const ESTADO_LABEL = { AI: 'Activo', IN: 'Inactivo' }
 const EMPTY_FILTERS = { search: '', role: '', team: '', estado: '' }

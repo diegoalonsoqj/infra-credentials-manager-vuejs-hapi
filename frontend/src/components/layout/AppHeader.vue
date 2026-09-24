@@ -101,6 +101,7 @@ const settingsStore = useSettingsStore()
 
 const ROLE_COLORS = {
   ADMIN:    'danger',
+  LEADER:   'dark',
   OPERATOR: 'primary',
   VIEWER:   'info',
   VISITOR:  'secondary',

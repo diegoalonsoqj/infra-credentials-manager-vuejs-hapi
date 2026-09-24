@@ -1,7 +1,7 @@
 'use strict';
 
 const repo = require('../repositories/audit.repository');
-const { requirePermission } = require('../plugins/rbac');
+const { requireAnyPermission } = require('../plugins/rbac');
 const { Joi, M, VALIDATION_OPTIONS, singleMessageFailAction, paginationQuery } = require('../validation');
 const { AUDIT_ACTIONS, RESULT } = require('../config/constants');
 
@@ -14,7 +14,9 @@ const VALID_RESULTS = Object.values(RESULT); // 'S', 'F'
 //
 // REGLAS:
 //   - NUNCA exponer endpoints de escritura, edición ni borrado.
-//   - GET /  → solo con permiso MOD_AUDIT: log completo con filtros.
+//   - GET /  → MOD_AUDIT: log completo con filtros.
+//              AUDIT_TEAM (líderes): los eventos sobre los tipos de recurso de
+//              su equipo, los haga quien los haga, más los suyos propios.
 //   - GET /my-activity → cualquier usuario autenticado, filtrado a su user_id.
 //   - GET /actions     → lista de acciones distintas (para filtros de UI).
 //
@@ -70,6 +72,18 @@ const validate = (query) => ({
 /** Normaliza un filtro opcional: la cadena vacía equivale a "sin filtro". */
 const filter = (value) => (value === undefined || value === '' ? undefined : value);
 
+const canReadAudit = requireAnyPermission('MOD_AUDIT', 'AUDIT_TEAM');
+
+/**
+ * Ámbito del log para quien llama. null = sin restricción (MOD_AUDIT). Con solo
+ * AUDIT_TEAM: los tipos de recurso de su equipo y sus propios eventos. Sin
+ * equipo, la lista de tipos queda vacía y solo ve lo suyo.
+ */
+function auditScope(user) {
+  if ((user.permissions || []).includes('MOD_AUDIT')) return null;
+  return { resourceTypes: user.teamResourceTypes || [], userId: user.id };
+}
+
 module.exports = {
   name: 'icm-routes-audit',
   register(server) {
@@ -82,7 +96,7 @@ module.exports = {
         path: '/actions',
         options: {
           auth: 'session',
-          pre: [requirePermission('MOD_AUDIT')],
+          pre: [canReadAudit],
         },
         handler: async () => ({ success: true, actions: await repo.findDistinctActions() }),
       },
@@ -129,22 +143,24 @@ module.exports = {
       },
 
       // -----------------------------------------------------------------
-      // GET /api/audit — Log completo (requiere MOD_AUDIT)
+      // GET /api/audit — Log completo (MOD_AUDIT) o de su equipo (AUDIT_TEAM)
       // -----------------------------------------------------------------
       {
         method: 'GET',
         path: '/',
         options: {
           auth: 'session',
-          pre: [requirePermission('MOD_AUDIT')],
+          pre: [canReadAudit],
           validate: validate(auditLogQuery),
         },
         handler: async (request) => {
           const q     = request.query;
           const page  = Math.max(1, Math.min((parseInt(q.page,  10) || 1), 10000));
           const limit = Math.max(1, (parseInt(q.limit, 10) || 30));
+          const scope = auditScope(request.auth.credentials);
 
           const result = await repo.findAll({
+            scope,
             page,
             limit:        Math.min(limit, 100),
             username:     filter(q.username),
@@ -155,7 +171,8 @@ module.exports = {
             dateFrom:     filter(q.dateFrom),
             dateTo:       filter(q.dateTo),
           });
-          return { success: true, ...result };
+          // La pantalla lo usa para decir qué se está viendo.
+          return { success: true, ...result, scope: scope ? { resourceTypes: scope.resourceTypes } : null };
         },
       },
     ]);

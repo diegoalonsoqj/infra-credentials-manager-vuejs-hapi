@@ -103,7 +103,7 @@ infra-credentials-manager-vuejs/
 │   ├── dist/                # build de producción (generado)
 │   └── vite.config.js
 ├── database/
-│   ├── migrations/          # 001..019_*.sql (se aplican con npm run migrate)
+│   ├── migrations/          # 001..020_*.sql (se aplican con npm run migrate)
 │   └── seeds/               # 001_base_data.sql (roles, equipos, catálogos)
 ├── deploy/
 │   ├── nginx-icm.conf       # proxy inverso de ejemplo
@@ -442,6 +442,12 @@ Es idempotente y está pensado para cron.
 ## Roles y permisos
 
 - **ADMIN** (nivel 100): acceso total al sistema.
+- **LEADER** — Líder de equipo (nivel 70): lo mismo que un operador y, además,
+  la **auditoría de los recursos de su equipo**: ve los eventos sobre los tipos
+  de recurso de su equipo, los haga quien los haga, y sus propios eventos. Un
+  líder cuyo equipo tiene OS y NET ve todo lo de servidores y red, pero nada de
+  bases de datos ni los inicios de sesión de otros. Lo da el permiso
+  `AUDIT_TEAM`, que también puede asignarse a otro rol desde *Catálogos → Roles*.
 - **VISITOR** (nivel 0): sin acceso a credenciales; solo el Generador de Contraseñas.
 - Usuarios con **equipo asignado**:
   - **DBA**: acceso a credenciales de bases de datos.

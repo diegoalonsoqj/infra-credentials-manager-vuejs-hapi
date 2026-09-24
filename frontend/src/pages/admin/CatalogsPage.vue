@@ -455,7 +455,7 @@
             <CCol :md="6">
               <CFormLabel class="small fw-semibold">Nivel (0–99) *</CFormLabel>
               <CFormInput size="sm" type="number" :min="0" :max="99" v-model.number="roleForm.level" required />
-              <div class="text-medium-emphasis" style="font-size: 11px; margin-top: 2px">VIEWER=20 · OPERATOR=50 · ADMIN=100 (reservado)</div>
+              <div class="text-medium-emphasis" style="font-size: 11px; margin-top: 2px">VIEWER=20 · OPERATOR=50 · LEADER=70 · ADMIN=100 (reservado)</div>
             </CCol>
             <CCol :md="12"><CFormLabel class="small fw-semibold">Nombre *</CFormLabel>
               <CFormInput size="sm" placeholder="ej: Operador Senior" v-model="roleForm.name" required /></CCol>
@@ -718,12 +718,13 @@ import CustodyImpactWarning from '../../components/catalogs/CustodyImpactWarning
 const PERM_GROUPS = [
   { label: 'Credenciales', codes: ['CRED_VIEW', 'CRED_EDIT', 'CRED_DELETE', 'CRED_REVEAL'] },
   { label: 'Recursos',     codes: ['RES_VIEW', 'RES_EDIT', 'RES_DELETE'] },
-  { label: 'Módulos',      codes: ['MOD_PWDGEN', 'MOD_USERS', 'MOD_AUDIT', 'MOD_CATALOGS', 'MOD_SECURITY', 'MOD_SYSTEM'] },
+  { label: 'Módulos',      codes: ['MOD_PWDGEN', 'MOD_USERS', 'MOD_AUDIT', 'AUDIT_TEAM', 'MOD_CATALOGS', 'MOD_SECURITY', 'MOD_SYSTEM'] },
 ]
 const ROLE_DEFAULT_PERMS = {
   VISITOR:  ['MOD_PWDGEN'],
   VIEWER:   ['MOD_PWDGEN', 'CRED_VIEW', 'RES_VIEW'],
   OPERATOR: ['MOD_PWDGEN', 'CRED_VIEW', 'CRED_EDIT', 'CRED_DELETE', 'CRED_REVEAL', 'RES_VIEW', 'RES_EDIT', 'RES_DELETE'],
+  LEADER:   ['MOD_PWDGEN', 'CRED_VIEW', 'CRED_EDIT', 'CRED_DELETE', 'CRED_REVEAL', 'RES_VIEW', 'RES_EDIT', 'RES_DELETE', 'AUDIT_TEAM'],
   ADMIN:    null,
 }
 // Mismos colores por tipo que las insignias de equipos (TEAM_RT_COLORS), las

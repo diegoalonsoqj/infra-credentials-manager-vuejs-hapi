@@ -144,8 +144,36 @@ function requirePermission(permissionCode) {
   };
 }
 
+/**
+ * Pre-handler: basta con tener UNO de los permisos indicados. Para rutas que
+ * admiten varios niveles de acceso y acotan después según cuál se tenga (la
+ * auditoría: MOD_AUDIT ve todo, AUDIT_TEAM solo lo de su equipo).
+ *
+ * @param {...string} permissionCodes
+ * @returns {function} Pre-handler de hapi.
+ */
+function requireAnyPermission(...permissionCodes) {
+  return (request, h) => {
+    const user = request.auth.credentials;
+    if (!user) return unauthorized(h);
+
+    const permissions = user.permissions || [];
+    if (!permissionCodes.some((code) => permissions.includes(code))) {
+      logger.warn('Acceso denegado por permiso insuficiente.', {
+        user:       user.username,
+        permission: permissionCodes.join('|'),
+        url:        urlOf(request),
+      });
+      return forbidden(h, 'No tienes permisos para realizar esta acción.');
+    }
+
+    return h.continue;
+  };
+}
+
 module.exports = {
   requireMinLevel,
   requirePermission,
+  requireAnyPermission,
   requireTeamScope,
 };

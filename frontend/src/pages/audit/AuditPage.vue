@@ -7,31 +7,27 @@
         <CCardBody class="py-2">
           <form @submit.prevent="handleApply">
             <div class="d-flex gap-2 align-items-center flex-wrap">
-              <CFormInput v-if="isAdmin" size="sm" placeholder="Usuario..."
+              <CFormInput v-if="canReadLog" size="sm" placeholder="Usuario..."
                 v-model="filters.username" style="flex: 1; min-width: 90px" />
               <CFormSelect size="sm" v-model="filters.action" style="flex: 1; min-width: 130px">
                 <option value="" disabled hidden>Acción</option>
-                <template v-if="isAdmin">
+                <template v-if="canReadLog">
                   <option v-for="a in availableActions" :key="a" :value="a">{{ ACTION_LABELS[a] || a }}</option>
                 </template>
                 <template v-else>
                   <option v-for="[k, v] in Object.entries(ACTION_LABELS)" :key="k" :value="k">{{ v }}</option>
                 </template>
               </CFormSelect>
-              <CFormSelect v-if="isAdmin" size="sm" v-model="filters.resourceType" style="width: 85px">
+              <CFormSelect v-if="canReadLog" size="sm" v-model="filters.resourceType" style="width: 85px">
                 <option value="" disabled hidden>Tipo</option>
-                <option value="DB">DB</option>
-                <option value="OS">OS</option>
-                <option value="APP">APP</option>
-                <option value="NET">NET</option>
-                <option value="SYS">SYS</option>
+                <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
               </CFormSelect>
               <CFormSelect size="sm" v-model="filters.result" style="width: 105px">
                 <option value="" disabled hidden>Resultado</option>
                 <option value="S">OK</option>
                 <option value="F">Error</option>
               </CFormSelect>
-              <CFormSelect v-if="isAdmin" size="sm" v-model="filters.isPrdAccess" style="width: 85px">
+              <CFormSelect v-if="canReadLog" size="sm" v-model="filters.isPrdAccess" style="width: 85px">
                 <option value="" disabled hidden>PRD</option>
                 <option value="true">Solo PRD</option>
               </CFormSelect>
@@ -43,6 +39,15 @@
           </form>
         </CCardBody>
       </CCard>
+
+      <!-- Qué se está viendo, cuando el log está acotado al equipo -->
+      <CAlert v-if="scope" color="info" class="py-2 small mb-3" style="flex-shrink: 0">
+        <template v-if="scope.resourceTypes.length">
+          Ves los eventos sobre recursos de tipo <strong>{{ scope.resourceTypes.join(', ') }}</strong>
+          (los de tu equipo), los haga quien los haga, y tus propios eventos.
+        </template>
+        <template v-else>Tu usuario no tiene equipo asignado: solo ves tus propios eventos.</template>
+      </CAlert>
 
       <!-- Tabla -->
       <CCard class="shadow-sm" style="flex: 1; display: flex; flex-direction: column; overflow: hidden">
@@ -56,13 +61,13 @@
             <CTableHead style="position: sticky; top: 0; z-index: 2; background: var(--cui-body-bg)">
               <CTableRow>
                 <CTableHeaderCell>Fecha</CTableHeaderCell>
-                <CTableHeaderCell v-if="isAdmin">Usuario</CTableHeaderCell>
+                <CTableHeaderCell v-if="canReadLog">Usuario</CTableHeaderCell>
                 <CTableHeaderCell>Acción</CTableHeaderCell>
-                <CTableHeaderCell v-if="isAdmin">Tipo</CTableHeaderCell>
+                <CTableHeaderCell v-if="canReadLog">Tipo</CTableHeaderCell>
                 <CTableHeaderCell>Recurso</CTableHeaderCell>
                 <CTableHeaderCell>Resultado</CTableHeaderCell>
                 <CTableHeaderCell>IP</CTableHeaderCell>
-                <CTableHeaderCell v-if="isAdmin">Flags</CTableHeaderCell>
+                <CTableHeaderCell v-if="canReadLog">Flags</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -70,12 +75,12 @@
                 <CTableDataCell class="text-medium-emphasis" style="white-space: nowrap">
                   {{ new Date(row.created_at).toLocaleString('es-PE') }}
                 </CTableDataCell>
-                <CTableDataCell v-if="isAdmin" class="fw-semibold">
+                <CTableDataCell v-if="canReadLog" class="fw-semibold">
                   <span v-if="row.username">{{ row.username }}</span>
                   <span v-else class="text-medium-emphasis">sistema</span>
                 </CTableDataCell>
                 <CTableDataCell>{{ ACTION_LABELS[row.action] || row.action }}</CTableDataCell>
-                <CTableDataCell v-if="isAdmin">
+                <CTableDataCell v-if="canReadLog">
                   <CBadge v-if="row.resource_type" color="secondary">{{ row.resource_type }}</CBadge>
                   <span v-else class="text-medium-emphasis">—</span>
                 </CTableDataCell>
@@ -90,7 +95,7 @@
                   </CBadge>
                 </CTableDataCell>
                 <CTableDataCell class="text-medium-emphasis">{{ row.ip_address || '—' }}</CTableDataCell>
-                <CTableDataCell v-if="isAdmin">
+                <CTableDataCell v-if="canReadLog">
                   <div class="d-flex gap-1">
                     <CBadge v-if="row.is_prd_access" color="danger" style="font-size: 10px">PRD</CBadge>
                     <CBadge v-if="row.is_custodied_access" color="warning" text-color="dark" style="font-size: 10px">
@@ -140,7 +145,18 @@ import { useAuthStore } from '../../store/authStore.js'
 import api from '../../api/index.js'
 
 const authStore = useAuthStore()
-const isAdmin   = computed(() => authStore.user?.role === 'ADMIN')
+// Se decide por permisos, no por el nombre del rol: antes un rol con MOD_AUDIT
+// que no se llamara ADMIN recibía del backend el log completo y la pantalla le
+// enseñaba solo lo suyo.
+const hasFullLog = computed(() => authStore.hasPermission('MOD_AUDIT'))
+const canReadLog = computed(() => hasFullLog.value || authStore.hasPermission('AUDIT_TEAM'))
+// Tipos del filtro: todos con el log completo; con AUDIT_TEAM, los de su equipo
+// y SYS (sus propios inicios de sesión y demás).
+const typeOptions = computed(() => hasFullLog.value
+  ? ['DB', 'OS', 'APP', 'NET', 'SYS']
+  : [...(authStore.user?.teamResourceTypes || []), 'SYS'])
+// Ámbito que devuelve el backend: null = log completo.
+const scope = ref(null)
 
 const RESULT_LABELS = { S: { label: 'OK', color: 'success' }, F: { label: 'Error', color: 'danger' } }
 const ACTION_LABELS = {
@@ -197,15 +213,16 @@ async function load() {
     if (applied.result)       params.result       = applied.result
     if (applied.dateFrom)     params.dateFrom     = applied.dateFrom
     if (applied.dateTo)       params.dateTo       = applied.dateTo
-    if (isAdmin.value) {
+    if (canReadLog.value) {
       if (applied.username)     params.username     = applied.username
       if (applied.resourceType) params.resourceType = applied.resourceType
       if (applied.isPrdAccess)  params.isPrdAccess  = applied.isPrdAccess
     }
-    const endpoint = isAdmin.value ? '/audit' : '/audit/me'
+    const endpoint = canReadLog.value ? '/audit' : '/audit/me'
     const data = await api.get(endpoint, { params })
     records.value = data.records || []
     total.value   = data.total   || 0
+    scope.value   = data.scope   || null
   } catch (err) {
     error.value = err?.message || 'Error al cargar el log de auditoría.'
   } finally {
@@ -234,7 +251,7 @@ function changePage(p) {
 watch(page, load)
 
 onMounted(async () => {
-  if (isAdmin.value) {
+  if (canReadLog.value) {
     try {
       const data = await api.get('/audit/actions')
       availableActions.value = data.actions || []

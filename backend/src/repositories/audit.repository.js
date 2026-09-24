@@ -49,9 +49,13 @@ function dateToCondition(dateTo, paramIndex) {
 }
 
 /**
- * Lista paginada del log completo con filtros (solo para ADMIN).
+ * Lista paginada del log con filtros.
  *
  * @param {object} opts
+ * @param {{resourceTypes: string[], userId: string}|null} [opts.scope]
+ *        null = log completo (MOD_AUDIT). Con ámbito: eventos de esos tipos de
+ *        recurso O del propio usuario. Se combina con AND con el resto de
+ *        filtros, así que ninguno puede sacar filas de fuera del ámbito.
  * @param {number}  opts.page
  * @param {number}  opts.limit
  * @param {string}  opts.username      - Búsqueda parcial por username
@@ -63,12 +67,20 @@ function dateToCondition(dateTo, paramIndex) {
  * @param {string}  opts.dateTo        - ISO 8601
  */
 async function findAll({
-  page = 1, limit = 30,
+  page = 1, limit = 30, scope = null,
   username, action, resourceType, result, isPrdAccess, dateFrom, dateTo,
 } = {}) {
   const offset = (page - 1) * limit;
   const params = [];
   const where  = [];
+
+  if (scope) {
+    // resource_type es CHAR(3): al compararlo con text se quitan los espacios
+    // de relleno ('DB ' = 'DB'), igual que en el filtro por tipo de abajo.
+    params.push(scope.resourceTypes || []);
+    params.push(scope.userId);
+    where.push(`(resource_type = ANY($${params.length - 1}::text[]) OR user_id = $${params.length}::uuid)`);
+  }
 
   // likePattern() escapa los comodines y descarta lo que no sea texto
   // utilizable (un array de la query string, por ejemplo).

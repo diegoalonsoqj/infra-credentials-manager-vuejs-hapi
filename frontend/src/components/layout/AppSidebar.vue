@@ -131,7 +131,7 @@
       </CNavItem>
 
       <!-- Auditoría -->
-      <CNavItem v-if="authStore.hasPermission('MOD_AUDIT')">
+      <CNavItem v-if="authStore.hasPermission('MOD_AUDIT') || authStore.hasPermission('AUDIT_TEAM')">
         <CNavLink
           :active="isActive('/audit')"
           @click="router.push('/audit')"

@@ -8,6 +8,7 @@
 
 const ROLES = Object.freeze({
   ADMIN:    'ADMIN',
+  LEADER:   'LEADER',
   OPERATOR: 'OPERATOR',
   VIEWER:   'VIEWER',
   VISITOR:  'VISITOR',
@@ -43,6 +44,8 @@ const PERMISSIONS = Object.freeze({
   // Módulos de administración
   MOD_USERS:    'MOD_USERS',
   MOD_AUDIT:    'MOD_AUDIT',
+  // Auditoría acotada a los tipos de recurso del equipo (migración 020).
+  AUDIT_TEAM:   'AUDIT_TEAM',
   MOD_CATALOGS: 'MOD_CATALOGS',
   MOD_SECURITY: 'MOD_SECURITY',
   MOD_SYSTEM:   'MOD_SYSTEM',
@@ -58,6 +61,7 @@ const ENVIRONMENTS = Object.freeze({
 // Ej: si el endpoint requiere nivel >= 50, tanto OPERATOR como ADMIN pueden acceder.
 const ROLE_LEVELS = Object.freeze({
   ADMIN:    100,
+  LEADER:   70,
   OPERATOR: 50,
   VIEWER:   20,
   VISITOR:  0,
