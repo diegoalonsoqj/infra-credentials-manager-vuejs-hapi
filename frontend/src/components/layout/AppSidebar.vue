@@ -21,7 +21,7 @@
         paddingRight: narrow ? 0 : '1rem',
       }"
     >
-      <KeyRound :size="22" style="flex-shrink: 0" />
+      <AppLogo :size="26" />
       <span v-if="!narrow" class="text-truncate">{{ settingsStore.appName }}</span>
     </CSidebarBrand>
 
@@ -219,6 +219,7 @@ import {
   LockKeyhole, ClipboardList, Users, Settings, RotateCcw,
   Wrench, Server, Network,
 } from 'lucide-vue-next'
+import AppLogo from '../AppLogo.vue'
 import { useAuthStore } from '../../store/authStore.js'
 import { useSettingsStore } from '../../store/settingsStore.js'
 

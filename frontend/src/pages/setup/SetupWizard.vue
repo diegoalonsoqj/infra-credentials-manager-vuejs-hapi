@@ -4,11 +4,7 @@
     class="bg-body-tertiary min-vh-100 d-flex flex-column align-items-center justify-content-center py-4">
     <div style="width: 100%; max-width: 480px">
       <div class="text-center mb-4">
-        <div style="width:52px;height:52px;border-radius:12px;background:var(--cui-primary);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
-            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93C9.33 17.79 7 14.5 7 11V7.18L12 5z"/>
-          </svg>
-        </div>
+        <AppLogo :size="52" class="mb-2" />
         <h4 class="mb-1 fw-semibold">infra-credentials-manager</h4>
         <p class="text-medium-emphasis small">Configuración inicial del sistema</p>
       </div>
@@ -42,11 +38,7 @@
 
       <!-- Header -->
       <div class="text-center mb-4">
-        <div style="width:52px;height:52px;border-radius:12px;background:var(--cui-primary);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
-            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93C9.33 17.79 7 14.5 7 11V7.18L12 5z"/>
-          </svg>
-        </div>
+        <AppLogo :size="52" class="mb-2" />
         <h4 class="mb-1 fw-semibold">infra-credentials-manager</h4>
         <p class="text-medium-emphasis small">Configuración inicial del sistema</p>
       </div>
@@ -357,6 +349,7 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, X, ArrowLeft, KeyRound, Eye, EyeOff, Copy, Download } from 'lucide-vue-next'
 import { setupApi } from '../../api/index.js'
+import AppLogo from '../../components/AppLogo.vue'
 import { copySecret } from '../../utils/clipboard.js'
 
 const router = useRouter()

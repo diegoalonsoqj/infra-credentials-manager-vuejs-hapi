@@ -7,11 +7,7 @@
             <CCardBody class="p-4">
 
               <div class="text-center mb-4">
-                <div style="width: 56px; height: 56px; border-radius: 12px; background: var(--cui-primary); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93C9.33 17.79 7 14.5 7 11V7.18L12 5z"/>
-                  </svg>
-                </div>
+                <AppLogo :size="56" class="mb-3" />
                 <h4 class="mb-1 fw-semibold">ICM</h4>
                 <p class="text-medium-emphasis small mb-0">Gestión de Credenciales de Infraestructura</p>
               </div>
@@ -111,6 +107,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../../api/index.js'
+import AppLogo from '../../components/AppLogo.vue'
 import { useAuthStore } from '../../store/authStore.js'
 
 const router    = useRouter()
