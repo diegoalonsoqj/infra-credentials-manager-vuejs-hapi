@@ -57,7 +57,7 @@
           <p v-else-if="records.length === 0" class="text-center text-medium-emphasis small py-4 mb-0">
             Sin registros para los filtros seleccionados.
           </p>
-          <CTable v-else small hover class="mb-0" style="font-size: 12px">
+          <CTable v-else small hover class="mb-0 table-inset" style="font-size: 12px">
             <CTableHead style="position: sticky; top: 0; z-index: 2; background: var(--cui-body-bg)">
               <CTableRow>
                 <CTableHeaderCell>Fecha</CTableHeaderCell>

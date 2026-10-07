@@ -56,7 +56,7 @@
           </div>
           <CAlert v-else-if="error" color="danger" class="m-3">{{ error }}</CAlert>
           <div v-else style="flex: 1; overflow-y: auto">
-            <CTable hover class="mb-0 table-sticky-head" style="font-size: 13px">
+            <CTable hover class="mb-0 table-inset table-sticky-head" style="font-size: 13px">
               <CTableHead>
                 <CTableRow>
                   <CTableHeaderCell>Código</CTableHeaderCell>

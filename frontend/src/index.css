@@ -27,3 +27,13 @@ html, body, #root {
   background-color: var(--cui-body-bg);
   box-shadow: 0 1px 0 var(--cui-border-color);
 }
+
+/* Tablas a ras de tarjeta (card-body sin relleno): la primera y la última
+   columna toman el margen lateral de la tarjeta, para que el texto no quede
+   pegado al borde y se alinee con los filtros de arriba. */
+.table-inset > :not(caption) > * > :first-child {
+  padding-left: var(--cui-card-spacer-x, 1rem);
+}
+.table-inset > :not(caption) > * > :last-child {
+  padding-right: var(--cui-card-spacer-x, 1rem);
+}

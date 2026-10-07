@@ -64,7 +64,7 @@
               <div v-if="loading" class="d-flex justify-content-center py-4"><CSpinner size="sm" /></div>
               <p v-else-if="recentActivity.length === 0" class="text-medium-emphasis small p-3 mb-0">Sin actividad registrada.</p>
               <div v-else class="table-responsive">
-                <table class="table table-sm table-hover mb-0" style="font-size: 12px">
+                <table class="table table-sm table-hover mb-0 table-inset" style="font-size: 12px">
                   <thead>
                     <tr>
                       <th class="ps-3">Acción</th><th>Usuario</th><th>Recurso</th><th>Resultado</th><th class="pe-3">Fecha</th>

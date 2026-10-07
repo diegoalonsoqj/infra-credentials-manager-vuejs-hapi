@@ -12,7 +12,7 @@
     <div v-if="loading" class="d-flex justify-content-center py-4"><CSpinner /></div>
     <CAlert v-else-if="error" color="danger" class="m-3">{{ error }}</CAlert>
     <template v-else>
-      <CTable small hover responsive class="mb-0" style="font-size: 13px">
+      <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
         <CTableHead>
           <CTableRow>
             <CTableHeaderCell>Código</CTableHeaderCell>

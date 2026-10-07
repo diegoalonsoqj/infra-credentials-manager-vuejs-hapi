@@ -61,7 +61,7 @@
           <p v-else-if="credentials.length === 0" class="text-center text-medium-emphasis small py-4 mb-0">
             Sin credenciales. <template v-if="canWrite">Crea la primera con el botón +.</template>
           </p>
-          <CTable v-else small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable v-else small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Usuario</CTableHeaderCell>

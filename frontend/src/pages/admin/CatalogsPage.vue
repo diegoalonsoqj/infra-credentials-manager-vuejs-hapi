@@ -46,7 +46,7 @@
 
         <!-- TAB: Ambientes -->
         <template v-if="tab === 'environments'">
-          <CTable small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Código</CTableHeaderCell>
@@ -89,7 +89,7 @@
 
         <!-- TAB: Infraestructuras -->
         <template v-else-if="tab === 'infrastructures'">
-          <CTable small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Código</CTableHeaderCell>
@@ -128,7 +128,7 @@
         <!-- TAB: Roles -->
         <template v-else-if="tab === 'roles'">
           <p class="text-medium-emphasis small px-3 pt-2 mb-1">Nivel máximo creable: 99 (100 es exclusivo del sistema ADMIN)</p>
-          <CTable small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Código</CTableHeaderCell>
@@ -171,7 +171,7 @@
 
         <!-- TAB: Equipos -->
         <template v-else-if="tab === 'teams'">
-          <CTable small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Código</CTableHeaderCell>
@@ -238,7 +238,7 @@
 
         <!-- TAB: Proyectos -->
         <template v-else-if="tab === 'projects'">
-          <CTable small hover responsive class="mb-0" style="font-size: 13px">
+          <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Código</CTableHeaderCell>

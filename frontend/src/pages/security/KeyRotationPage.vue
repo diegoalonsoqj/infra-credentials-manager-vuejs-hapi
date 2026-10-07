@@ -146,7 +146,7 @@
             <span class="fw-semibold small">Historial de rotaciones</span>
           </CCardHeader>
           <CCardBody class="p-0">
-            <CTable small hover responsive class="mb-0" style="font-size: 13px">
+            <CTable small hover responsive class="mb-0 table-inset" style="font-size: 13px">
               <CTableHead>
                 <CTableRow>
                   <CTableHeaderCell>Alias</CTableHeaderCell>

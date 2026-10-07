@@ -130,7 +130,7 @@
             <CCardBody class="p-0">
               <CAlert v-if="sessionError" color="danger" class="m-3 py-2 small">{{ sessionError }}</CAlert>
               <p v-if="sessions.length === 0" class="text-center text-medium-emphasis small py-4 mb-0">Sin sesiones activas.</p>
-              <CTable v-else small hover responsive class="mb-0" style="font-size: 13px">
+              <CTable v-else small hover responsive class="mb-0 table-inset" style="font-size: 13px">
                 <CTableHead>
                   <CTableRow>
                     <CTableHeaderCell>Navegador</CTableHeaderCell>
